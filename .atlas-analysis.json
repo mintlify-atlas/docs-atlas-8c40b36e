@@ -1,0 +1,134 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "fluxer.py",
+  "projectDescription": "A Python API wrapper for Fluxer with async-first design, event-driven architecture, and command framework",
+  "theme": "palm",
+  "primaryColor": "#4641d9",
+  "lightColor": "#7c78ff",
+  "darkColor": "#2d2a99",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Core Concepts",
+            "pages": [
+              "concepts/client-vs-bot",
+              "concepts/events",
+              "concepts/intents",
+              "concepts/commands"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/cogs",
+              "guides/voice",
+              "guides/error-handling",
+              "guides/rate-limiting"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/basic-bot",
+              "examples/cog-example",
+              "examples/voice-playback"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core Classes",
+            "pages": [
+              "api/client",
+              "api/bot",
+              "api/http-client",
+              "api/gateway"
+            ]
+          },
+          {
+            "group": "Models",
+            "pages": [
+              "api/models/message",
+              "api/models/channel",
+              "api/models/guild",
+              "api/models/user",
+              "api/models/embed",
+              "api/models/voice-state",
+              "api/models/webhook"
+            ]
+          },
+          {
+            "group": "Enums & Types",
+            "pages": [
+              "api/intents",
+              "api/permissions",
+              "api/enums"
+            ]
+          },
+          {
+            "group": "Extensions",
+            "pages": [
+              "api/cog",
+              "api/voice",
+              "api/checks"
+            ]
+          },
+          {
+            "group": "Exceptions",
+            "pages": [
+              "api/errors"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Async-first design built on asyncio",
+    "REST API client with automatic rate limiting",
+    "WebSocket gateway for real-time events",
+    "Decorator-based command framework",
+    "Modular cog system for organizing code",
+    "Optional voice support with LiveKit",
+    "Strongly-typed data models",
+    "Clean separation between low-level Client and high-level Bot"
+  ],
+  "publicApiSurface": [
+    "Client",
+    "Bot",
+    "Cog",
+    "HTTPClient",
+    "Gateway",
+    "Message",
+    "Channel",
+    "Guild",
+    "User",
+    "GuildMember",
+    "Embed",
+    "VoiceState",
+    "Webhook",
+    "Intents",
+    "Permissions",
+    "ChannelType",
+    "FluxerException",
+    "HTTPException",
+    "FFmpegPCMAudio",
+    "VoiceClient",
+    "has_role",
+    "has_permission"
+  ]
+}
