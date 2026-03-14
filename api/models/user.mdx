@@ -1,0 +1,167 @@
+---
+title: 'User'
+description: 'Represents a Fluxer user'
+---
+
+## Overview
+
+The `User` class represents a Fluxer user. This contains fields that are available across most endpoints (guild members, message authors, etc.).
+
+<Note>
+  Some fields like `bio`, `banner_hash`, and `banner_color` are ONLY available when fetching your own user via `GET /users/@me`, not when fetching other users via `GET /users/{user_id}`.
+</Note>
+
+## Attributes
+
+<ResponseField name="id" type="int" required>
+  The user's unique ID (snowflake).
+</ResponseField>
+
+<ResponseField name="username" type="str" required>
+  The user's username.
+</ResponseField>
+
+<ResponseField name="discriminator" type="str | None">
+  The user's discriminator (legacy feature).
+</ResponseField>
+
+<ResponseField name="global_name" type="str | None">
+  The user's display name/nickname.
+</ResponseField>
+
+<ResponseField name="avatar_hash" type="str | None">
+  The hash of the user's avatar.
+</ResponseField>
+
+<ResponseField name="avatar_color" type="str | None">
+  The user's avatar color.
+</ResponseField>
+
+<ResponseField name="bot" type="bool">
+  Whether the user is a bot.
+</ResponseField>
+
+<ResponseField name="flags" type="int">
+  User flags bitfield.
+</ResponseField>
+
+<ResponseField name="bio" type="str | None">
+  User bio/about me text. Only available for your own user.
+</ResponseField>
+
+<ResponseField name="banner_hash" type="str | None">
+  Banner image hash. Only available for your own user.
+</ResponseField>
+
+<ResponseField name="banner_color" type="int | None">
+  Banner color as an integer. Only available for your own user.
+</ResponseField>
+
+## Properties
+
+<ResponseField name="created_at" type="datetime">
+  When this user account was created (derived from snowflake ID).
+</ResponseField>
+
+<ResponseField name="display_name" type="str">
+  The best display name for this user. Returns `global_name` if set, otherwise falls back to `username`. This is the name you should show to users.
+</ResponseField>
+
+<ResponseField name="mention" type="str">
+  A string that mentions this user in a message (e.g., `<@123456>`).
+</ResponseField>
+
+<ResponseField name="avatar_url" type="str | None">
+  URL for the user's avatar, or None if they use the default.
+</ResponseField>
+
+<ResponseField name="default_avatar_url" type="str">
+  URL for the user's default avatar.
+</ResponseField>
+
+<ResponseField name="banner_url" type="str | None">
+  URL for the user's banner, or None if they don't have one.
+</ResponseField>
+
+## Methods
+
+### from_data
+
+```python
+@classmethod
+def from_data(cls, data: dict[str, Any], http: HTTPClient | None = None) -> User
+```
+
+Construct a User from raw API data.
+
+<ParamField path="data" type="dict[str, Any]" required>
+  Raw user object from the API.
+</ParamField>
+
+<ParamField path="http" type="HTTPClient | None">
+  HTTPClient for making further requests.
+</ParamField>
+
+### create_dm
+
+```python
+async def create_dm(self) -> Channel
+```
+
+Open a DM channel with this user. Returns the existing DM channel if one is already open.
+
+**Example:**
+
+```python
+# Open a DM channel
+dm_channel = await user.create_dm()
+await dm_channel.send("Hello!")
+```
+
+### send
+
+```python
+async def send(
+    self,
+    content: str | None = None,
+    *,
+    embed: Any | None = None,
+    embeds: list[Any] | None = None,
+    file: File | None = None,
+    files: list[File] | None = None,
+    **kwargs: Any,
+) -> Message
+```
+
+Send a DM to this user. Opens a DM channel, then sends the message.
+
+<ParamField path="content" type="str | None">
+  The message content.
+</ParamField>
+
+<ParamField path="embed" type="Any | None">
+  A single embed to include.
+</ParamField>
+
+<ParamField path="embeds" type="list[Any] | None">
+  Multiple embeds to include.
+</ParamField>
+
+<ParamField path="file" type="File | None">
+  A single File object to attach.
+</ParamField>
+
+<ParamField path="files" type="list[File] | None">
+  Multiple File objects to attach.
+</ParamField>
+
+**Example:**
+
+```python
+# Send a DM to a user
+await user.send("Hello! Thanks for joining our server.")
+
+# Send a DM with an embed
+embed = Embed(title="Welcome", description="Glad to have you here!")
+await user.send(embed=embed)
+```

@@ -1,0 +1,219 @@
+---
+title: 'Embed'
+description: 'Builder for rich embed objects'
+---
+
+## Overview
+
+The `Embed` class is a builder for creating rich embed objects that can be sent in messages. Embeds allow you to send richly formatted messages with titles, descriptions, fields, images, and more.
+
+## Attributes
+
+<ResponseField name="title" type="str | None">
+  The embed title.
+</ResponseField>
+
+<ResponseField name="description" type="str | None">
+  The embed description.
+</ResponseField>
+
+<ResponseField name="url" type="str | None">
+  URL that the title links to.
+</ResponseField>
+
+<ResponseField name="color" type="int | None">
+  Color code of the embed (as an integer).
+</ResponseField>
+
+<ResponseField name="timestamp" type="str | None">
+  ISO 8601 timestamp for the embed.
+</ResponseField>
+
+<ResponseField name="footer" type="dict[str, Any] | None">
+  Footer information.
+</ResponseField>
+
+<ResponseField name="image" type="dict[str, Any] | None">
+  Image information.
+</ResponseField>
+
+<ResponseField name="thumbnail" type="dict[str, Any] | None">
+  Thumbnail information.
+</ResponseField>
+
+<ResponseField name="author" type="dict[str, Any] | None">
+  Author information.
+</ResponseField>
+
+<ResponseField name="fields" type="list[dict[str, Any]]">
+  List of embed fields.
+</ResponseField>
+
+## Methods
+
+### set_footer
+
+```python
+def set_footer(self, *, text: str, icon_url: str | None = None) -> Embed
+```
+
+Set the footer of the embed.
+
+<ParamField path="text" type="str" required>
+  Footer text.
+</ParamField>
+
+<ParamField path="icon_url" type="str | None">
+  URL of footer icon.
+</ParamField>
+
+**Example:**
+
+```python
+embed.set_footer(text="Footer text", icon_url="https://example.com/icon.png")
+```
+
+### set_image
+
+```python
+def set_image(self, *, url: str) -> Embed
+```
+
+Set the image of the embed.
+
+<ParamField path="url" type="str" required>
+  URL of the image.
+</ParamField>
+
+**Example:**
+
+```python
+embed.set_image(url="https://example.com/image.png")
+```
+
+### set_thumbnail
+
+```python
+def set_thumbnail(self, *, url: str) -> Embed
+```
+
+Set the thumbnail of the embed.
+
+<ParamField path="url" type="str" required>
+  URL of the thumbnail.
+</ParamField>
+
+**Example:**
+
+```python
+embed.set_thumbnail(url="https://example.com/thumbnail.png")
+```
+
+### set_author
+
+```python
+def set_author(
+    self,
+    *,
+    name: str,
+    url: str | None = None,
+    icon_url: str | None = None
+) -> Embed
+```
+
+Set the author of the embed.
+
+<ParamField path="name" type="str" required>
+  Name of the author.
+</ParamField>
+
+<ParamField path="url" type="str | None">
+  URL that the author name links to.
+</ParamField>
+
+<ParamField path="icon_url" type="str | None">
+  URL of the author icon.
+</ParamField>
+
+**Example:**
+
+```python
+embed.set_author(
+    name="Author Name",
+    url="https://example.com",
+    icon_url="https://example.com/avatar.png"
+)
+```
+
+### add_field
+
+```python
+def add_field(self, *, name: str, value: str, inline: bool = False) -> Embed
+```
+
+Add a field to the embed.
+
+<ParamField path="name" type="str" required>
+  Name of the field.
+</ParamField>
+
+<ParamField path="value" type="str" required>
+  Value of the field.
+</ParamField>
+
+<ParamField path="inline" type="bool">
+  Whether the field should be displayed inline (default False).
+</ParamField>
+
+**Example:**
+
+```python
+embed.add_field(name="Field 1", value="Value 1", inline=True)
+embed.add_field(name="Field 2", value="Value 2", inline=True)
+```
+
+### to_dict
+
+```python
+def to_dict(self) -> dict[str, Any]
+```
+
+Serialize the embed to a dictionary suitable for the API.
+
+## Usage Example
+
+```python
+from fluxer import Embed
+
+# Create a rich embed
+embed = Embed(
+    title="Hello, World!",
+    description="This is a rich embed",
+    color=0x5865F2
+)
+
+# Add fields
+embed.add_field(name="Field 1", value="Value 1", inline=True)
+embed.add_field(name="Field 2", value="Value 2", inline=True)
+
+# Set footer and image
+embed.set_footer(text="Footer text")
+embed.set_image(url="https://example.com/image.png")
+
+# Send the embed
+await channel.send(embed=embed)
+```
+
+## Color Examples
+
+Colors are specified as hexadecimal integers:
+
+```python
+# Common colors
+red = 0xFF0000
+green = 0x00FF00
+blue = 0x0000FF
+fluxer_purple = 0x5865F2
+
+embed = Embed(title="Colored Embed", color=fluxer_purple)
+```

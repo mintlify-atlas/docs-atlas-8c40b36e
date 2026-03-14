@@ -1,0 +1,588 @@
+---
+title: Commands
+description: Understanding the command framework in fluxer.py
+---
+
+## Overview
+
+The `Bot` class provides a powerful command framework built on top of the event system. Commands are defined using decorators and support automatic argument parsing, type hints, and keyword-only arguments.
+
+<Note>
+Commands are only available in the `Bot` class, not in `Client`. See [Client vs Bot](/concepts/client-vs-bot) for details.
+</Note>
+
+## Basic Command
+
+Use the `@bot.command()` decorator to register a command:
+
+```python
+import fluxer
+
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+@bot.command()
+async def ping(ctx):
+    """Responds with Pong!"""
+    await ctx.reply("Pong!")
+
+bot.run("your_token_here")
+```
+
+When a user sends `!ping`, the bot replies with "Pong!".
+
+## Command Context
+
+The first parameter of every command is `ctx` (context), which is actually the `Message` object:
+
+```python
+@bot.command()
+async def info(ctx):
+    await ctx.reply(f"Author: {ctx.author.username}")
+    await ctx.reply(f"Channel: {ctx.channel.id}")
+    await ctx.reply(f"Content: {ctx.content}")
+```
+
+The context provides access to:
+- `ctx.author`: The user who sent the message
+- `ctx.channel`: The channel where the message was sent
+- `ctx.guild`: The guild (server) where the message was sent
+- `ctx.content`: The full message content
+- `ctx.reply()`: Method to reply to the message
+
+## Custom Command Names
+
+By default, the command name is the function name. Use the `name` parameter to customize it:
+
+```python
+@bot.command(name="hello")
+async def greet(ctx):
+    await ctx.reply(f"Hello, {ctx.author.username}!")
+
+# User types: !hello
+# Bot responds: Hello, Username!
+```
+
+## Command Arguments
+
+Commands can accept arguments that are automatically parsed from the message.
+
+### Positional Arguments
+
+```python
+@bot.command()
+async def say(ctx, message):
+    """Repeats what you say"""
+    await ctx.reply(message)
+
+# User: !say hello
+# Bot: hello
+```
+
+### Multiple Arguments
+
+```python
+@bot.command()
+async def add(ctx, a, b):
+    """Adds two numbers"""
+    result = int(a) + int(b)
+    await ctx.reply(f"Result: {result}")
+
+# User: !add 5 3
+# Bot: Result: 8
+```
+
+### Keyword-Only Arguments
+
+Use `*` to capture the rest of the message as a single argument:
+
+```python
+@bot.command()
+async def say(ctx, *, message):
+    """Repeats a multi-word message"""
+    await ctx.reply(message)
+
+# User: !say hello world everyone
+# Bot: hello world everyone
+```
+
+<Info>
+Without `*`, arguments are split by spaces. With `*`, everything after the command is captured as one string.
+</Info>
+
+### Comparison: With and Without `*`
+
+<Tabs>
+  <Tab title="Without *">
+    ```python
+    @bot.command()
+    async def say(ctx, message):
+        await ctx.reply(message)
+
+    # User: !say hello world
+    # Bot: hello
+    # (Only captures the first word)
+    ```
+  </Tab>
+
+  <Tab title="With *">
+    ```python
+    @bot.command()
+    async def say(ctx, *, message):
+        await ctx.reply(message)
+
+    # User: !say hello world
+    # Bot: hello world
+    # (Captures the entire message)
+    ```
+  </Tab>
+</Tabs>
+
+## Type Hints
+
+Commands support automatic type conversion using Python type hints:
+
+```python
+@bot.command()
+async def multiply(ctx, a: int, b: int):
+    """Multiplies two integers"""
+    result = a * b
+    await ctx.reply(f"{a} × {b} = {result}")
+
+# User: !multiply 7 6
+# Bot: 7 × 6 = 42
+```
+
+Supported types:
+- `int`: Converts to integer
+- `float`: Converts to float
+- `bool`: Converts to boolean (`true`, `1`, `yes`, `y` → True)
+- `str`: No conversion (default)
+
+### Type Conversion Logic
+
+From `client.py:776-793`:
+
+```python
+def _convert_argument(self, value: str, annotation: Any) -> Any:
+    """Convert a string argument to the appropriate type based on annotation."""
+    if annotation == inspect.Parameter.empty or annotation is str:
+        return value
+
+    try:
+        if annotation is int:
+            return int(value)
+        elif annotation is float:
+            return float(value)
+        elif annotation is bool:
+            return value.lower() in ("true", "1", "yes", "y")
+        else:
+            # Try to call the annotation as a constructor
+            return annotation(value)
+    except (ValueError, TypeError):
+        # If conversion fails, return as string
+        return value
+```
+
+## Default Values
+
+Commands can have optional arguments with default values:
+
+```python
+@bot.command()
+async def greet(ctx, name: str = "friend"):
+    """Greets someone (or 'friend' by default)"""
+    await ctx.reply(f"Hello, {name}!")
+
+# User: !greet
+# Bot: Hello, friend!
+
+# User: !greet Alice
+# Bot: Hello, Alice!
+```
+
+### With Keyword-Only Arguments
+
+```python
+@bot.command()
+async def announce(ctx, *, message: str = "No announcement"):
+    """Makes an announcement"""
+    await ctx.reply(f"📢 {message}")
+
+# User: !announce
+# Bot: 📢 No announcement
+
+# User: !announce Server maintenance tonight
+# Bot: 📢 Server maintenance tonight
+```
+
+## Error Handling
+
+If a required argument is missing, the bot sends an error message:
+
+```python
+@bot.command()
+async def kick(ctx, user: str):
+    await ctx.reply(f"Kicked {user}")
+
+# User: !kick
+# Bot: ❌ Error: kick() missing 1 required positional argument: 'user'
+```
+
+From `client.py:676-688`:
+
+```python
+try:
+    # Parse arguments based on function signature
+    args_str = content[len(cmd) :].strip()
+    await self._invoke_command(handler, message, args_str)
+except TypeError as e:
+    # Handle missing required arguments
+    if "missing" in str(e) and "required" in str(e):
+        await message.reply(f"❌ Error: {e}")
+    else:
+        raise
+except Exception:
+    log.exception("Error in command '%s'", cmd)
+    break
+```
+
+## Command Invocation
+
+The command framework parses arguments and invokes commands based on the function signature.
+
+### Invocation Logic
+
+From `client.py:690-774`:
+
+```python
+async def _invoke_command(
+    self, handler: EventHandler, message: Message, args_str: str
+) -> None:
+    """Parse arguments and invoke a command handler.
+
+    Supports:
+    - Positional arguments: async def cmd(ctx, arg1, arg2)
+    - Keyword-only arguments: async def cmd(ctx, *, message)
+    - Type hints: async def cmd(ctx, count: int)
+    - Default values: async def cmd(ctx, message: str = "default")
+    """
+    sig = inspect.signature(handler)
+    params = list(sig.parameters.values())
+
+    # First parameter is always the ctx (context/message)
+    if not params or params[0].name != "ctx":
+        # If function doesn't take ctx as first param, just pass message
+        await handler(message)
+        return
+
+    # Remove the ctx parameter from processing
+    params = params[1:]
+
+    # Check if there are any parameters that need parsing
+    if not params:
+        await handler(message)
+        return
+
+    # Check for keyword-only parameters (indicated by * in signature)
+    # e.g., async def say(ctx, *, message: str)
+    has_kwonly = any(p.kind == inspect.Parameter.KEYWORD_ONLY for p in params)
+
+    if has_kwonly and len(params) == 1:
+        # Single keyword-only argument captures all remaining text
+        param = params[0]
+
+        # Check if argument was provided
+        if not args_str and param.default == inspect.Parameter.empty:
+            raise TypeError(
+                f"{handler.__name__}() missing 1 required keyword-only argument: '{param.name}'"
+            )
+
+        # Use default if no args provided
+        if not args_str:
+            await handler(message)
+            return
+
+        # Convert to the appropriate type if type hint exists
+        value = self._convert_argument(args_str, param.annotation)
+        await handler(message, **{param.name: value})
+    else:
+        # Multiple positional or mixed arguments
+        # Split args_str into individual arguments
+        args = args_str.split() if args_str else []
+
+        # Build the argument list
+        call_args = [message]
+        call_kwargs = {}
+
+        for i, param in enumerate(params):
+            if param.kind == inspect.Parameter.KEYWORD_ONLY:
+                # Keyword-only args capture remaining text
+                remaining = " ".join(args[i:]) if i < len(args) else ""
+                if not remaining and param.default == inspect.Parameter.empty:
+                    raise TypeError(
+                        f"{handler.__name__}() missing 1 required keyword-only argument: '{param.name}'"
+                    )
+                if remaining:
+                    value = self._convert_argument(remaining, param.annotation)
+                    call_kwargs[param.name] = value
+                break
+            else:
+                # Positional argument
+                if i < len(args):
+                    value = self._convert_argument(args[i], param.annotation)
+                    call_args.append(value)
+                elif param.default != inspect.Parameter.empty:
+                    # Use default value
+                    break
+                else:
+                    raise TypeError(
+                        f"{handler.__name__}() missing 1 required positional argument: '{param.name}'"
+                    )
+
+        await handler(*call_args, **call_kwargs)
+```
+
+## Command Processing
+
+When a message is received, the bot checks if it starts with the command prefix and tries to match it to a registered command.
+
+From `client.py:663-688`:
+
+```python
+async def _process_commands(self, message: Message) -> None:
+    """Check if a message matches a registered command and invoke it."""
+    if message.author.bot:
+        return
+    if not message.content.startswith(self.command_prefix):
+        return
+
+    # Parse command name and args
+    content = message.content[len(self.command_prefix) :]
+    # Use list() to avoid RuntimeError if commands dict is modified during iteration
+    for cmd, handler in list(self._commands.items()):
+        if content.startswith(cmd):
+            if handler:
+                try:
+                    # Parse arguments based on function signature
+                    args_str = content[len(cmd) :].strip()
+                    await self._invoke_command(handler, message, args_str)
+                except TypeError as e:
+                    # Handle missing required arguments
+                    if "missing" in str(e) and "required" in str(e):
+                        await message.reply(f"❌ Error: {e}")
+                    else:
+                        raise
+                except Exception:
+                    log.exception("Error in command '%s'", cmd)
+                break
+```
+
+<Note>
+Bot automatically ignores messages from other bots to prevent command loops.
+</Note>
+
+## Advanced Examples
+
+### Multi-Argument Command with Types
+
+```python
+@bot.command()
+async def repeat(ctx, times: int, *, text: str):
+    """Repeats text a specified number of times"""
+    if times > 10:
+        await ctx.reply("Too many repetitions! Max is 10.")
+        return
+    
+    result = "\n".join([text] * times)
+    await ctx.reply(result)
+
+# User: !repeat 3 Hello World
+# Bot:
+# Hello World
+# Hello World
+# Hello World
+```
+
+### Command with Validation
+
+```python
+@bot.command()
+async def setprefix(ctx, *, new_prefix: str):
+    """Changes the command prefix"""
+    if len(new_prefix) > 5:
+        await ctx.reply("Prefix too long! Max 5 characters.")
+        return
+    
+    bot.command_prefix = new_prefix
+    await ctx.reply(f"Prefix changed to: {new_prefix}")
+
+# User: !setprefix >>
+# Bot: Prefix changed to: >>
+```
+
+### Command with Optional Arguments
+
+```python
+@bot.command()
+async def userinfo(ctx, username: str = None):
+    """Shows info about a user (or yourself)"""
+    if username is None:
+        user = ctx.author
+    else:
+        # Fetch user by username (simplified)
+        user = ctx.author  # In real bot, you'd search for the user
+    
+    await ctx.reply(
+        f"Username: {user.username}\n"
+        f"ID: {user.id}\n"
+        f"Bot: {user.bot}"
+    )
+```
+
+### Math Command
+
+```python
+@bot.command()
+async def calc(ctx, a: float, operator: str, b: float):
+    """Simple calculator"""
+    if operator == "+":
+        result = a + b
+    elif operator == "-":
+        result = a - b
+    elif operator == "*":
+        result = a * b
+    elif operator == "/":
+        if b == 0:
+            await ctx.reply("Cannot divide by zero!")
+            return
+        result = a / b
+    else:
+        await ctx.reply(f"Unknown operator: {operator}")
+        return
+    
+    await ctx.reply(f"{a} {operator} {b} = {result}")
+
+# User: !calc 10 * 5
+# Bot: 10.0 * 5.0 = 50.0
+```
+
+## Command Decorator Signature
+
+From `client.py:638-661`:
+
+```python
+def command(
+    self, name: str | None = None
+) -> Callable[[EventHandler], EventHandler]:
+    """Decorator to register a prefix command.
+
+    Usage:
+        @bot.command()
+        async def ping(ctx):
+            await ctx.reply("Pong!")
+
+        @bot.command(name="hello")
+        async def greet(ctx):
+            await ctx.reply(f"Hello, {ctx.author}!")
+    """
+
+    def decorator(func: EventHandler) -> EventHandler:
+        cmd_name = name or func.__name__
+        self._commands[cmd_name] = func
+        self._commands = dict(
+            sorted(self._commands.items(), key=lambda kv: len(kv[0]), reverse=True)
+        )  # sorts the dictionary in reverse key length order
+        return func
+
+    return decorator
+```
+
+<Info>
+Commands are stored sorted by name length (longest first) to match longer command names before shorter ones.
+</Info>
+
+## Custom Command Prefix
+
+You can use any prefix:
+
+```python
+# Question mark prefix
+bot = fluxer.Bot(command_prefix="?", intents=fluxer.Intents.default())
+
+# Double character prefix
+bot = fluxer.Bot(command_prefix=">>", intents=fluxer.Intents.default())
+
+# Mention prefix (requires custom logic)
+bot = fluxer.Bot(command_prefix=f"<@{bot_id}> ", intents=fluxer.Intents.default())
+```
+
+## Bypassing Command Processing
+
+If you need to process messages without triggering commands, use the `Client` class instead of `Bot`, or override the `on_message` event:
+
+```python
+@bot.event
+async def on_message(message):
+    # Custom message handling
+    print(f"Message: {message.content}")
+    
+    # Don't forget to process commands if you override on_message!
+    await bot._process_commands(message)
+```
+
+<Warning>
+If you register an `on_message` event handler when using `Bot`, commands may not work unless you manually call `await bot._process_commands(message)`.
+</Warning>
+
+## Complete Example
+
+```python
+import fluxer
+
+bot = fluxer.Bot(
+    command_prefix="!",
+    intents=fluxer.Intents.default() | fluxer.Intents.MESSAGE_CONTENT
+)
+
+@bot.event
+async def on_ready():
+    print(f"Bot ready! Logged in as {bot.user.username}")
+
+@bot.command()
+async def ping(ctx):
+    """Responds with Pong!"""
+    await ctx.reply("Pong!")
+
+@bot.command(name="hello")
+async def greet(ctx, *, name: str = "friend"):
+    """Greets someone"""
+    await ctx.reply(f"Hello, {name}!")
+
+@bot.command()
+async def add(ctx, a: int, b: int):
+    """Adds two numbers"""
+    await ctx.reply(f"{a} + {b} = {a + b}")
+
+@bot.command()
+async def repeat(ctx, times: int, *, message: str):
+    """Repeats a message"""
+    if times > 5:
+        await ctx.reply("Maximum 5 repetitions!")
+        return
+    
+    for _ in range(times):
+        await ctx.reply(message)
+
+bot.run("your_token_here")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Events" icon="bolt" href="/concepts/events">
+    Learn about the event system underlying commands
+  </Card>
+  <Card title="Cogs" icon="puzzle-piece" href="/guides/cogs">
+    Organize commands into modular cogs
+  </Card>
+</CardGroup>

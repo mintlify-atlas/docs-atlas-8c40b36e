@@ -1,0 +1,422 @@
+---
+title: Voice
+description: Voice channel connections and audio playback
+---
+
+## Overview
+
+Fluxer provides voice support through LiveKit integration. The voice module allows your bot to:
+- Connect to voice channels
+- Play audio from files using FFmpeg
+- Stream audio from custom sources
+- Control playback (play, pause, resume, stop)
+
+<Note>
+Voice support requires the `voice` extra:
+```bash
+pip install fluxer.py[voice]
+```
+</Note>
+
+## VoiceClient
+
+Manages a voice connection to a channel.
+
+```python
+class VoiceClient:
+    """Manages a voice connection to a channel via LiveKit."""
+```
+
+### Constructor
+
+```python
+def __init__(self, guild_id: int, channel_id: int, gateway: Gateway) -> None
+```
+
+<ParamField path="guild_id" type="int" required>
+  The guild ID where the voice channel is located
+</ParamField>
+
+<ParamField path="channel_id" type="int" required>
+  The voice channel ID to connect to
+</ParamField>
+
+<ParamField path="gateway" type="Gateway" required>
+  The gateway instance (managed internally)
+</ParamField>
+
+<Note>
+You typically don't create VoiceClient instances directly. Use `await guild.connect_voice(channel_id)` instead.
+</Note>
+
+### Properties
+
+<ResponseField name="is_connected" type="bool">
+  Whether the voice client is currently connected to a voice channel
+</ResponseField>
+
+<ResponseField name="is_playing" type="bool">
+  Whether audio is currently being played
+</ResponseField>
+
+<ResponseField name="is_paused" type="bool">
+  Whether playback is currently paused
+</ResponseField>
+
+<ResponseField name="channel_id" type="int">
+  The voice channel ID this client is connected to
+</ResponseField>
+
+<ResponseField name="guild_id" type="int">
+  The guild ID this client is connected to
+</ResponseField>
+
+### Methods
+
+#### `play()`
+
+Play an audio source.
+
+```python
+async def play(
+    self,
+    source: FFmpegPCMAudio | rtc.AudioSource,
+    *,
+    after: Callable[[Exception | None], Any] | None = None,
+) -> None
+```
+
+<ParamField path="source" type="FFmpegPCMAudio | rtc.AudioSource" required>
+  The audio source to play. Either an FFmpegPCMAudio instance or a LiveKit AudioSource.
+</ParamField>
+
+<ParamField path="after" type="Callable[[Exception | None], Any] | None">
+  Optional callback to run after playback finishes. Receives `None` on success or an exception on error. Only supported for FFmpegPCMAudio sources.
+</ParamField>
+
+**Example:**
+
+```python
+voice = await guild.connect_voice(channel_id)
+
+# Play a file
+source = FFmpegPCMAudio("song.mp3")
+await voice.play(source, after=lambda e: print(f"Finished playing: {e}"))
+
+# Play a URL
+source = FFmpegPCMAudio("https://example.com/audio.mp3")
+await voice.play(source)
+```
+
+---
+
+#### `pause()`
+
+Pause playback.
+
+```python
+def pause(self) -> None
+```
+
+**Example:**
+
+```python
+voice.pause()
+```
+
+---
+
+#### `resume()`
+
+Resume paused playback.
+
+```python
+def resume(self) -> None
+```
+
+**Example:**
+
+```python
+voice.resume()
+```
+
+---
+
+#### `stop()`
+
+Stop playback and unpublish the audio track.
+
+```python
+async def stop(self) -> None
+```
+
+**Example:**
+
+```python
+await voice.stop()
+```
+
+---
+
+#### `play_file()`
+
+Convenience method to play a file and wait until it finishes.
+
+```python
+async def play_file(
+    self,
+    path: str,
+    *,
+    after: Callable[[Exception | None], Any] | None = None,
+) -> None
+```
+
+<ParamField path="path" type="str" required>
+  Path to the audio file (local path or URL)
+</ParamField>
+
+<ParamField path="after" type="Callable[[Exception | None], Any] | None">
+  Optional callback to run after playback finishes
+</ParamField>
+
+**Example:**
+
+```python
+voice = await guild.connect_voice(channel_id)
+await voice.play_file("song.mp3")
+print("Finished playing!")
+```
+
+---
+
+#### `disconnect()`
+
+Disconnect from the voice channel.
+
+```python
+async def disconnect(self) -> None
+```
+
+**Example:**
+
+```python
+await voice.disconnect()
+```
+
+### Context Manager
+
+VoiceClient supports async context manager for automatic cleanup:
+
+```python
+async with await guild.connect_voice(channel_id) as voice:
+    await voice.play_file("song.mp3")
+# Automatically disconnects when exiting the context
+```
+
+---
+
+## FFmpegPCMAudio
+
+An audio source that reads from a file via FFmpeg.
+
+```python
+class FFmpegPCMAudio:
+    """An audio source that reads from a file via ffmpeg."""
+```
+
+### Constructor
+
+```python
+def __init__(
+    self,
+    path: str,
+    *,
+    executable: str = "ffmpeg",
+    before_options: str | None = None,
+    options: str | None = None,
+    sample_rate: int = 48000,
+    num_channels: int = 2,
+) -> None
+```
+
+<ParamField path="path" type="str" required>
+  Path to the audio file or URL to play
+</ParamField>
+
+<ParamField path="executable" type="str" default="ffmpeg">
+  Path to the FFmpeg executable
+</ParamField>
+
+<ParamField path="before_options" type="str | None">
+  Additional FFmpeg options to pass before the `-i` flag
+</ParamField>
+
+<ParamField path="options" type="str | None">
+  Additional FFmpeg options to pass after the input file
+</ParamField>
+
+<ParamField path="sample_rate" type="int" default="48000">
+  Audio sample rate in Hz
+</ParamField>
+
+<ParamField path="num_channels" type="int" default="2">
+  Number of audio channels (1 = mono, 2 = stereo)
+</ParamField>
+
+### Examples
+
+#### Play Local File
+
+```python
+from fluxer.voice import FFmpegPCMAudio
+
+source = FFmpegPCMAudio("music/song.mp3")
+await voice.play(source)
+```
+
+#### Play from URL
+
+```python
+source = FFmpegPCMAudio(
+    "https://example.com/audio.mp3",
+    before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
+)
+await voice.play(source)
+```
+
+#### Custom Sample Rate
+
+```python
+source = FFmpegPCMAudio(
+    "audio.wav",
+    sample_rate=44100,
+    num_channels=1  # Mono
+)
+await voice.play(source)
+```
+
+#### With Callback
+
+```python
+def playback_finished(error):
+    if error:
+        print(f"Playback error: {error}")
+    else:
+        print("Playback completed successfully")
+
+source = FFmpegPCMAudio("song.mp3")
+await voice.play(source, after=playback_finished)
+```
+
+---
+
+## Complete Example
+
+```python
+import fluxer
+from fluxer import Intents
+from fluxer.voice import FFmpegPCMAudio
+
+bot = fluxer.Bot(intents=Intents.default() | Intents.GUILD_VOICE_STATES)
+
+@bot.command()
+async def join(ctx):
+    """Join the voice channel."""
+    # Get the author's voice state
+    if ctx.guild_id is None:
+        await ctx.reply("This command only works in servers!")
+        return
+    
+    # Get member's voice state
+    member = await bot.http.get_guild_member(ctx.guild_id, ctx.author.id)
+    voice_state = member.get("voice_state")
+    
+    if not voice_state or not voice_state.get("channel_id"):
+        await ctx.reply("You need to be in a voice channel!")
+        return
+    
+    channel_id = int(voice_state["channel_id"])
+    voice = await bot.connect_voice(ctx.guild_id, channel_id)
+    await ctx.reply(f"Joined <#{channel_id}>!")
+
+@bot.command()
+async def play(ctx, *, url: str):
+    """Play audio from a URL."""
+    if ctx.guild_id not in bot.voice_clients:
+        await ctx.reply("I'm not in a voice channel! Use !join first.")
+        return
+    
+    voice = bot.voice_clients[ctx.guild_id]
+    
+    source = FFmpegPCMAudio(
+        url,
+        before_options="-reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5"
+    )
+    
+    await voice.play(source)
+    await ctx.reply(f"Now playing: {url}")
+
+@bot.command()
+async def pause(ctx):
+    """Pause playback."""
+    if ctx.guild_id not in bot.voice_clients:
+        await ctx.reply("I'm not in a voice channel!")
+        return
+    
+    voice = bot.voice_clients[ctx.guild_id]
+    voice.pause()
+    await ctx.reply("Paused playback.")
+
+@bot.command()
+async def resume(ctx):
+    """Resume playback."""
+    if ctx.guild_id not in bot.voice_clients:
+        await ctx.reply("I'm not in a voice channel!")
+        return
+    
+    voice = bot.voice_clients[ctx.guild_id]
+    voice.resume()
+    await ctx.reply("Resumed playback.")
+
+@bot.command()
+async def stop(ctx):
+    """Stop playback."""
+    if ctx.guild_id not in bot.voice_clients:
+        await ctx.reply("I'm not in a voice channel!")
+        return
+    
+    voice = bot.voice_clients[ctx.guild_id]
+    await voice.stop()
+    await ctx.reply("Stopped playback.")
+
+@bot.command()
+async def leave(ctx):
+    """Leave the voice channel."""
+    if ctx.guild_id not in bot.voice_clients:
+        await ctx.reply("I'm not in a voice channel!")
+        return
+    
+    voice = bot.voice_clients[ctx.guild_id]
+    await voice.disconnect()
+    await ctx.reply("Left the voice channel.")
+
+bot.run("YOUR_TOKEN")
+```
+
+## Requirements
+
+- **FFmpeg**: Must be installed and available in your system PATH
+- **livekit**: Installed automatically with `pip install fluxer.py[voice]`
+- **GUILD_VOICE_STATES intent**: Required to receive voice state updates
+
+## Notes
+
+- Audio is encoded as 48kHz stereo PCM by default
+- FFmpeg reads audio in 20ms frames (960 samples at 48kHz)
+- The voice client automatically handles reconnection and track management
+- Use the `after` callback to chain audio playback or handle errors
+
+## Source Reference
+
+- VoiceClient: `fluxer/voice.py:42-271`
+- FFmpegPCMAudio: `fluxer/voice.py:21-40`

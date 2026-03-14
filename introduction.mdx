@@ -1,0 +1,108 @@
+---
+title: "Introduction"
+description: "A Python API wrapper for Fluxer with async-first design, event-driven architecture, and command framework"
+---
+
+## Welcome to fluxer.py
+
+**fluxer.py** is a powerful Python library for building bots and automated clients on the [Fluxer](https://fluxer.app) platform. It provides a clean, type-safe, and event-driven architecture that makes bot development straightforward and enjoyable.
+
+<CardGroup cols={2}>
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get up and running with your first bot in minutes
+  </Card>
+  <Card title="API Reference" icon="code" href="/api/client">
+    Explore the complete API documentation
+  </Card>
+  <Card title="Examples" icon="book" href="/examples/basic-bot">
+    Learn from real-world bot examples
+  </Card>
+  <Card title="GitHub" icon="github" href="https://github.com/akarealemil/fluxer.py">
+    View the source code and contribute
+  </Card>
+</CardGroup>
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Async-First Design" icon="bolt">
+    Built on asyncio for high-performance concurrent operations
+  </Card>
+  <Card title="REST API Client" icon="server">
+    Automatic rate limiting and retry logic for reliable API calls
+  </Card>
+  <Card title="WebSocket Gateway" icon="satellite-dish">
+    Real-time event handling with automatic reconnection
+  </Card>
+  <Card title="Command Framework" icon="terminal">
+    Decorator-based commands with automatic argument parsing
+  </Card>
+  <Card title="Modular Cogs" icon="grid">
+    Organize your bot into reusable, maintainable modules
+  </Card>
+  <Card title="Voice Support" icon="microphone">
+    Optional voice playback with LiveKit and FFmpeg
+  </Card>
+  <Card title="Type-Safe Models" icon="shield-check">
+    Strongly-typed data models for all Fluxer entities
+  </Card>
+  <Card title="Client & Bot Classes" icon="layer-group">
+    Choose between low-level control or high-level convenience
+  </Card>
+</CardGroup>
+
+## Quick Example
+
+Here's a simple bot that responds to a ping command:
+
+```python
+import fluxer
+
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+@bot.event
+async def on_ready():
+    print(f"Bot is ready! Logged in as {bot.user.username}")
+
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+
+if __name__ == "__main__":
+    TOKEN = "your_bot_token"
+    bot.run(TOKEN)
+```
+
+## Architecture
+
+fluxer.py is designed with a clear separation of concerns:
+
+- **HTTPClient** — Handles REST requests with automatic rate limiting
+- **Gateway** — Manages WebSocket connection and event dispatch
+- **Client** — Base event-driven interface for full control
+- **Bot** — High-level command framework built on Client
+- **Cog** — Modular system for organizing commands and events
+
+## Requirements
+
+- Python 3.10 or higher
+- `aiohttp` for async HTTP requests
+- `emoji` for emoji handling
+- Optional: `livekit` for voice support
+
+## Getting Help
+
+<CardGroup cols={2}>
+  <Card title="Installation Guide" icon="download" href="/installation">
+    Learn how to install fluxer.py and its dependencies
+  </Card>
+  <Card title="Core Concepts" icon="lightbulb" href="/concepts/client-vs-bot">
+    Understand the fundamental concepts and architecture
+  </Card>
+  <Card title="Join Discord" icon="discord" href="https://fluxer.gg/fluxer-py">
+    Get help from the community
+  </Card>
+  <Card title="Report Issues" icon="bug" href="https://github.com/akarealemil/fluxer.py/issues">
+    Found a bug? Let us know on GitHub
+  </Card>
+</CardGroup>

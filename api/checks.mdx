@@ -1,0 +1,274 @@
+---
+title: Checks
+description: Command decorators for permission and role requirements
+---
+
+## Overview
+
+Checks are decorators that restrict command access based on roles or permissions. They automatically verify that the command user has the required authorization before executing the command.
+
+Both check decorators work with:
+- Standalone commands (defined with `@bot.command()`)
+- Cog commands (defined with `@Cog.command()`)
+
+## has_role()
+
+Restrict a command to users who have a specific role.
+
+```python
+def has_role(
+    name: str | None = None,
+    id: int | str | None = None
+) -> Callable
+```
+
+<ParamField path="name" type="str | None">
+  Role name to require (case-sensitive)
+</ParamField>
+
+<ParamField path="id" type="int | str | None">
+  Role ID to require
+</ParamField>
+
+<Note>
+You must provide either `name` or `id`, but not both.
+</Note>
+
+### Examples
+
+#### Check by Role Name
+
+```python
+import fluxer
+import fluxer.checks
+
+bot = fluxer.Bot(intents=fluxer.Intents.default())
+
+@bot.command()
+@fluxer.checks.has_role(name="Moderator")
+async def warn(ctx, user: str):
+    await ctx.reply(f"Warning {user}...")
+```
+
+#### Check by Role ID
+
+```python
+@bot.command()
+@fluxer.checks.has_role(id=987654321098765432)
+async def secret(ctx):
+    await ctx.reply("You found the secret command!")
+```
+
+#### With Cog
+
+```python
+from fluxer.cog import Cog
+import fluxer.checks
+
+class ModerationCog(Cog):
+    @Cog.command()
+    @fluxer.checks.has_role(name="Moderator")
+    async def kick(self, ctx, user: str):
+        await ctx.reply(f"Kicking {user}...")
+```
+
+### Behavior
+
+- **Guild-only**: Command will fail in DMs with message "This command can only be used in a server."
+- **Role matching**: Role names are case-sensitive
+- **Failure response**: Users without the role receive "You don't have permission to use this command."
+- **Invalid config**: If neither `name` nor `id` is provided, sends "Invalid role requirement configuration."
+
+---
+
+## has_permission()
+
+Restrict a command to members who have specific permission(s).
+
+```python
+def has_permission(permission: Permissions) -> Callable
+```
+
+<ParamField path="permission" type="Permissions" required>
+  A Permissions flag, or multiple flags combined with `|`, that the member must have
+</ParamField>
+
+### Examples
+
+#### Single Permission
+
+```python
+import fluxer
+import fluxer.checks
+from fluxer import Permissions
+
+bot = fluxer.Bot(intents=fluxer.Intents.default())
+
+@bot.command()
+@fluxer.checks.has_permission(Permissions.KICK_MEMBERS)
+async def kick(ctx, user: str):
+    await ctx.reply(f"Kicking {user}...")
+```
+
+#### Multiple Permissions
+
+```python
+@bot.command()
+@fluxer.checks.has_permission(Permissions.KICK_MEMBERS | Permissions.BAN_MEMBERS)
+async def punish(ctx, user: str):
+    await ctx.reply(f"You can kick and ban. Punishing {user}...")
+```
+
+#### With Cog
+
+```python
+from fluxer.cog import Cog
+import fluxer.checks
+from fluxer import Permissions
+
+class AdminCog(Cog):
+    @Cog.command()
+    @fluxer.checks.has_permission(Permissions.ADMINISTRATOR)
+    async def config(self, ctx):
+        await ctx.reply("Opening admin configuration...")
+    
+    @Cog.command()
+    @fluxer.checks.has_permission(Permissions.MANAGE_MESSAGES | Permissions.MANAGE_CHANNELS)
+    async def cleanup(self, ctx):
+        await ctx.reply("Cleaning up channels...")
+```
+
+### Permission Calculation
+
+The check calculates permissions by:
+1. Fetching the guild, member, and roles data
+2. Computing the cumulative permissions from all member's roles
+3. Including the `@everyone` role (role ID equals guild ID)
+
+### Bypasses
+
+**Guild Owner**: The guild owner bypasses all permission checks automatically.
+
+**Administrator Permission**: Members with `ADMINISTRATOR` permission bypass all other permission checks.
+
+```python
+# Even without KICK_MEMBERS, admins can use this
+@bot.command()
+@fluxer.checks.has_permission(Permissions.KICK_MEMBERS)
+async def kick(ctx, user: str):
+    await ctx.reply(f"Kicking {user}...")
+```
+
+### Behavior
+
+- **Guild-only**: Command will fail in DMs with message "This command can only be used in a server."
+- **Failure response**: Users without permissions receive "You don't have permission to use this command."
+- **Cumulative permissions**: All of the user's roles contribute to their final permissions
+- **Bypass hierarchy**:
+  1. Guild owner (always passes)
+  2. Administrator permission (always passes)
+  3. Specific permission check
+
+---
+
+## Complete Example
+
+```python
+import fluxer
+import fluxer.checks
+from fluxer import Intents, Permissions
+from fluxer.cog import Cog
+
+bot = fluxer.Bot(intents=Intents.default())
+
+# Standalone command with role check
+@bot.command()
+@fluxer.checks.has_role(name="DJ")
+async def play(ctx, song: str):
+    await ctx.reply(f"Playing: {song}")
+
+# Standalone command with permission check
+@bot.command()
+@fluxer.checks.has_permission(Permissions.MANAGE_GUILD)
+async def settings(ctx):
+    await ctx.reply("Opening server settings...")
+
+# Cog with multiple checks
+class ModerationCog(Cog):
+    @Cog.command()
+    @fluxer.checks.has_permission(Permissions.KICK_MEMBERS)
+    async def kick(self, ctx, user: str):
+        user_id = int(user.strip('<@!>'))
+        await self.bot.http.kick_guild_member(ctx.guild_id, user_id)
+        await ctx.reply(f"Kicked <@{user_id}>")
+    
+    @Cog.command()
+    @fluxer.checks.has_permission(Permissions.BAN_MEMBERS)
+    async def ban(self, ctx, user: str, *, reason: str = "No reason"):
+        user_id = int(user.strip('<@!>'))
+        await self.bot.http.ban_guild_member(ctx.guild_id, user_id, reason=reason)
+        await ctx.reply(f"Banned <@{user_id}>. Reason: {reason}")
+    
+    @Cog.command()
+    @fluxer.checks.has_role(name="Moderator")
+    async def warn(self, ctx, user: str):
+        await ctx.reply(f"Warned {user}")
+    
+    @Cog.command()
+    @fluxer.checks.has_permission(Permissions.MANAGE_MESSAGES | Permissions.READ_MESSAGE_HISTORY)
+    async def purge(self, ctx, amount: int):
+        await ctx.reply(f"Purging {amount} messages...")
+
+bot.run("YOUR_TOKEN")
+```
+
+## Stacking Checks
+
+You can stack multiple check decorators to require both role and permission:
+
+```python
+@bot.command()
+@fluxer.checks.has_role(name="Admin")
+@fluxer.checks.has_permission(Permissions.ADMINISTRATOR)
+async def dangerous(ctx):
+    await ctx.reply("This requires both the Admin role AND admin permission")
+```
+
+## Error Handling
+
+Checks send user-friendly error messages automatically:
+
+- DM usage: "This command can only be used in a server."
+- Missing role: "You don't have permission to use this command."
+- Missing permission: "You don't have permission to use this command."
+
+For custom error handling, you can check permissions manually:
+
+```python
+from fluxer import Permissions
+
+@bot.command()
+async def kick(ctx, user: str):
+    # Manual permission check
+    member = await bot.http.get_guild_member(ctx.guild_id, ctx.author.id)
+    # ... compute permissions ...
+    
+    if not (permissions & Permissions.KICK_MEMBERS):
+        await ctx.reply("You need the Kick Members permission!")
+        return
+    
+    # Kick logic here
+    await ctx.reply(f"Kicked {user}")
+```
+
+## Notes
+
+- Both decorators require the command context to have `guild_id` (won't work in DMs)
+- Both decorators require an HTTP client to be available on the context
+- Role name matching is case-sensitive
+- Permission checks are cumulative across all user roles
+- Guild owners and administrators bypass permission checks
+
+## Source Reference
+
+Defined in `fluxer/checks.py:14-160`

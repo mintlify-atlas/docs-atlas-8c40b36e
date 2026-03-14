@@ -1,0 +1,433 @@
+---
+title: Rate Limiting
+description: Understand and handle rate limits in your Fluxer bot
+---
+
+Fluxer, like most APIs, implements rate limiting to prevent abuse and ensure fair usage. fluxer.py handles rate limits automatically, but understanding how they work helps you build more efficient bots.
+
+## How Rate Limiting Works
+
+Rate limits restrict how many requests you can make to the API within a specific time window. Fluxer returns rate limit information via HTTP headers on every response.
+
+### Rate Limit Headers
+
+Fluxer uses the same rate limit pattern as Discord:
+
+| Header | Description |
+|--------|-------------|
+| `X-RateLimit-Limit` | Maximum requests allowed in the window |
+| `X-RateLimit-Remaining` | Requests remaining in the current window |
+| `X-RateLimit-Reset` | Unix timestamp when the limit resets |
+| `X-RateLimit-Reset-After` | Seconds until the limit resets |
+| `X-RateLimit-Bucket` | Opaque bucket identifier for this route |
+
+### Rate Limit Buckets
+
+Different API routes have different rate limits, organized into "buckets":
+
+- **Per-route buckets**: `/channels/{channel_id}/messages` has its own limit
+- **Major parameter buckets**: Routes with `channel_id`, `guild_id`, or `webhook_id` get separate buckets per ID
+- **Global rate limit**: A shared limit across all requests
+
+**Example buckets:**
+```
+GET /channels/123/messages        → Bucket: GET /channels/{channel_id}/messages:123
+GET /channels/456/messages        → Bucket: GET /channels/{channel_id}/messages:456
+POST /channels/123/messages       → Bucket: POST /channels/{channel_id}/messages:123
+GET /users/@me                    → Bucket: GET /users/@me
+```
+
+<Note>
+Each bucket has independent rate limits. Hitting the limit on one bucket doesn't affect others.
+</Note>
+
+## Automatic Rate Limit Handling
+
+fluxer.py automatically handles rate limits for you:
+
+1. **Pre-emptive waiting**: If a bucket is exhausted, requests wait before sending
+2. **429 retries**: If a 429 response is received, the library waits and retries
+3. **Global rate limit**: Global rate limits pause all requests
+
+```python
+# This is handled automatically - no code needed!
+await channel.send("Message 1")
+await channel.send("Message 2")
+await channel.send("Message 3")
+# If rate limited, these will wait automatically
+```
+
+<Warning>
+While automatic handling is convenient, it can cause delays. Design your bot to avoid hitting rate limits when possible.
+</Warning>
+
+## The RateLimiter Class
+
+The `RateLimiter` class manages rate limit state and enforces waiting.
+
+### Implementation
+
+From `fluxer/http.py`:
+
+```python
+class RateLimiter:
+    """Per-route rate limit handler using Fluxer's response headers.
+
+    Fluxer returns rate limit info via HTTP headers (same pattern as Discord):
+        X-RateLimit-Limit: max requests in window
+        X-RateLimit-Remaining: requests left
+        X-RateLimit-Reset: Unix timestamp when the limit resets
+        X-RateLimit-Reset-After: seconds until reset
+        X-RateLimit-Bucket: opaque bucket identifier
+    """
+
+    def __init__(self) -> None:
+        self._locks: dict[str, asyncio.Lock] = {}
+        self._reset_times: dict[str, float] = {}
+        self._global_lock = asyncio.Event()
+        self._global_lock.set()  # Not locked initially
+
+    def _get_lock(self, bucket: str) -> asyncio.Lock:
+        if bucket not in self._locks:
+            self._locks[bucket] = asyncio.Lock()
+        return self._locks[bucket]
+
+    async def acquire(self, bucket: str) -> None:
+        """Wait if this bucket or global rate limit is active."""
+        # Wait for global rate limit to clear
+        await self._global_lock.wait()
+
+        lock = self._get_lock(bucket)
+        await lock.acquire()
+
+        # Check if we need to wait for this bucket
+        reset_at = self._reset_times.get(bucket)
+        if reset_at is not None:
+            now = asyncio.get_event_loop().time()
+            if now < reset_at:
+                delay = reset_at - now
+                log.debug("Rate limited on bucket %s, waiting %.2fs", bucket, delay)
+                await asyncio.sleep(delay)
+
+    def release(self, bucket: str, headers: dict[str, str]) -> None:
+        """Update rate limit state from response headers and release the lock."""
+        remaining = headers.get("X-RateLimit-Remaining")
+        reset_after = headers.get("X-RateLimit-Reset-After")
+
+        if remaining is not None and int(remaining) == 0 and reset_after is not None:
+            delay = float(reset_after)
+            self._reset_times[bucket] = asyncio.get_event_loop().time() + delay
+            log.debug("Bucket %s exhausted, reset in %.2fs", bucket, delay)
+        else:
+            self._reset_times.pop(bucket, None)
+
+        lock = self._get_lock(bucket)
+        if lock.locked():
+            lock.release()
+
+    def set_global(self, retry_after: float) -> None:
+        """Activate a global rate limit."""
+        self._global_lock.clear()
+        log.warning("Global rate limit hit, pausing for %.2fs", retry_after)
+
+        async def _unlock() -> None:
+            await asyncio.sleep(retry_after)
+            self._global_lock.set()
+
+        asyncio.ensure_future(_unlock())
+```
+
+### How It Works
+
+<Steps>
+  <Step title="Acquire a lock">
+    Before making a request, `RateLimiter.acquire()` is called for the route's bucket. This ensures only one request per bucket happens at a time.
+  </Step>
+
+  <Step title="Check reset times">
+    If the bucket was previously exhausted, the request waits until the reset time.
+  </Step>
+
+  <Step title="Make the request">
+    The HTTP request is sent to the API.
+  </Step>
+
+  <Step title="Update state">
+    After receiving the response, `RateLimiter.release()` updates the bucket state based on the rate limit headers.
+  </Step>
+
+  <Step title="Handle 429 responses">
+    If a 429 (rate limited) response is received, the request waits for `retry_after` seconds and retries.
+  </Step>
+</Steps>
+
+## Route Buckets
+
+The `Route` class defines the API endpoint and calculates the rate limit bucket.
+
+```python
+class Route:
+    """Represents an API route. Used for rate limit bucketing.
+
+    Usage:
+        route = Route("GET", "/channels/{channel_id}/messages", channel_id="123")
+        # route.url = "https://api.fluxer.app/v1/channels/123/messages"
+        # route.bucket = "GET /channels/{channel_id}/messages:123"
+    """
+
+    def __init__(
+        self, method: str, path: str, base_url: str = DEFAULT_API_URL, **params: Any
+    ) -> None:
+        self.method = method
+        self.path = path
+        self.base_url = base_url
+        self.params = {k: str(v) for k, v in params.items()}
+        self.url = self.base_url + path.format(**self.params)
+
+        # Rate limit bucket key: method + path template + major params
+        self.bucket = f"{method} {path}"
+        for key in ("channel_id", "guild_id", "webhook_id"):
+            if key in self.params:
+                self.bucket += f":{self.params[key]}"
+```
+
+**Example buckets:**
+```python
+Route("GET", "/channels/{channel_id}/messages", channel_id="123")
+# Bucket: GET /channels/{channel_id}/messages:123
+
+Route("POST", "/guilds/{guild_id}/channels", guild_id="456")
+# Bucket: POST /guilds/{guild_id}/channels:456
+
+Route("GET", "/users/@me")
+# Bucket: GET /users/@me
+```
+
+## Handling 429 Responses
+
+When the API returns a 429 status, fluxer.py automatically retries after waiting.
+
+### Retry Logic
+
+From `fluxer/http.py`:
+
+```python
+# Rate limited
+if resp.status == 429:
+    body = await resp.json()
+    retry_after = body.get("retry_after", 1.0)
+    is_global = body.get("global", False)
+
+    if is_global:
+        self._rate_limiter.set_global(retry_after)
+    else:
+        log.warning(
+            "Rate limited on %s, retry in %.2fs (attempt %d)",
+            route.url,
+            retry_after,
+            attempt + 1,
+        )
+        await asyncio.sleep(retry_after)
+    attempt += 1
+    if not retry_forever and attempt > max_retries:
+        raise RuntimeError(
+            f"Failed after {attempt} attempts: {route.method} {route.url}"
+        )
+    continue
+```
+
+<Note>
+By default, fluxer.py retries up to 4 times. You can configure this with `max_retries` or `retry_forever` parameters.
+</Note>
+
+## Configuring Retry Behavior
+
+You can customize retry behavior when creating the `HTTPClient`.
+
+```python
+from fluxer.http import HTTPClient
+
+# Default: 4 retries
+http = HTTPClient(token="YOUR_TOKEN", max_retries=4)
+
+# Retry forever (use with caution!)
+http = HTTPClient(token="YOUR_TOKEN", retry_forever=True)
+
+# Disable retries
+http = HTTPClient(token="YOUR_TOKEN", max_retries=0)
+```
+
+You can also override retry settings per request:
+
+```python
+await http.request(
+    route,
+    json=payload,
+    max_retries=10,
+    retry_forever=False
+)
+```
+
+<Warning>
+Setting `retry_forever=True` can cause indefinite blocking if rate limits persist. Use it only for critical operations.
+</Warning>
+
+## Best Practices
+
+<Steps>
+  <Step title="Batch operations when possible">
+    Use bulk endpoints (like `bulk_delete_messages`) instead of making many individual requests.
+
+    ```python
+    # Bad: Multiple requests
+    for msg_id in message_ids:
+        await channel.delete_message(msg_id)
+
+    # Good: Single request
+    await channel.bulk_delete_messages(message_ids)
+    ```
+  </Step>
+
+  <Step title="Add delays between non-critical requests">
+    If you're making many non-critical requests, add small delays to avoid hitting limits.
+
+    ```python
+    import asyncio
+
+    for user_id in user_ids:
+        await fetch_user(user_id)
+        await asyncio.sleep(0.1)  # Small delay
+    ```
+  </Step>
+
+  <Step title="Cache data locally">
+    Don't repeatedly fetch the same data. Cache it when possible.
+
+    ```python
+    # Bad: Fetches user repeatedly
+    for _ in range(10):
+        user = await bot.fetch_user(user_id)
+
+    # Good: Fetch once
+    user = await bot.fetch_user(user_id)
+    for _ in range(10):
+        # Use cached user
+        print(user.username)
+    ```
+  </Step>
+
+  <Step title="Use gateway events instead of polling">
+    Listen for events (like `on_message`) instead of polling the API.
+
+    ```python
+    # Bad: Polling for new messages
+    while True:
+        messages = await channel.fetch_messages(limit=1)
+        await asyncio.sleep(1)
+
+    # Good: Event listener
+    @bot.event
+    async def on_message(message):
+        # Handle new messages
+        pass
+    ```
+  </Step>
+
+  <Step title="Monitor rate limit headers">
+    Enable debug logging to see when you're approaching limits.
+
+    ```python
+    import logging
+
+    logging.basicConfig(level=logging.DEBUG)
+    ```
+  </Step>
+</Steps>
+
+## Global Rate Limits
+
+Global rate limits apply across **all** requests, not just individual buckets. When hit, all API requests pause.
+
+```python
+def set_global(self, retry_after: float) -> None:
+    """Activate a global rate limit."""
+    self._global_lock.clear()
+    log.warning("Global rate limit hit, pausing for %.2fs", retry_after)
+
+    async def _unlock() -> None:
+        await asyncio.sleep(retry_after)
+        self._global_lock.set()
+
+    asyncio.ensure_future(_unlock())
+```
+
+<Warning>
+Hitting global rate limits indicates your bot is making too many requests. Consider optimizing your code.
+</Warning>
+
+## Example: Rate Limit-Aware Bot
+
+Here's a bot that demonstrates rate limit best practices:
+
+```python
+import fluxer
+import asyncio
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+# Cache for user data
+user_cache = {}
+
+@bot.command()
+async def bulk_kick(ctx, *user_ids: int):
+    """Kick multiple users with proper rate limit handling."""
+    await ctx.reply(f"Kicking {len(user_ids)} users...")
+
+    for i, user_id in enumerate(user_ids):
+        try:
+            await ctx.guild.kick_member(user_id)
+            # Small delay to avoid hitting rate limits
+            if i < len(user_ids) - 1:  # Don't delay after last kick
+                await asyncio.sleep(0.5)
+        except fluxer.errors.Forbidden:
+            await ctx.send(f"No permission to kick {user_id}")
+        except fluxer.errors.NotFound:
+            await ctx.send(f"User {user_id} not found")
+
+    await ctx.reply("Done!")
+
+@bot.command()
+async def user(ctx, user_id: int):
+    """Get user info with caching."""
+    # Check cache first
+    if user_id in user_cache:
+        user = user_cache[user_id]
+        await ctx.reply(f"(Cached) {user.username}")
+    else:
+        user = await bot.fetch_user(str(user_id))
+        user_cache[user_id] = user
+        await ctx.reply(f"{user.username}")
+
+@bot.command()
+async def purge(ctx, limit: int):
+    """Delete messages using bulk delete."""
+    messages = await ctx.channel.fetch_messages(limit=limit)
+    message_ids = [msg.id for msg in messages]
+
+    # Use bulk delete instead of individual deletes
+    await ctx.channel.bulk_delete_messages(message_ids)
+    await ctx.reply(f"Deleted {len(message_ids)} messages.")
+
+bot.run("YOUR_BOT_TOKEN")
+```
+
+## Summary
+
+- fluxer.py **automatically handles** rate limits with retries
+- Rate limits are organized into **buckets** per route and major parameters
+- The `RateLimiter` class manages locks and waiting
+- **Best practices**: batch requests, cache data, use events over polling
+- Enable debug logging to monitor rate limit usage

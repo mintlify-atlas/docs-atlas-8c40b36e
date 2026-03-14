@@ -1,0 +1,206 @@
+---
+title: Installation
+description: Install fluxer.py and get your development environment ready
+---
+
+## Requirements
+
+fluxer.py requires **Python 3.10 or higher**. The library supports Python 3.10, 3.11, 3.12, and 3.13.
+
+You can check your Python version by running:
+
+```bash
+python --version
+```
+
+## Basic Installation
+
+<Steps>
+  <Step title="Install fluxer.py">
+    Choose your preferred package manager to install fluxer.py:
+
+    <CodeGroup>
+      ```bash pip
+      pip install fluxer.py
+      ```
+
+      ```bash uv
+      uv add fluxer.py
+      ```
+    </CodeGroup>
+
+    This will install the core library with all essential dependencies:
+    - `aiohttp>=3.9.0,<4.0.0` - Async HTTP client for REST API requests
+    - `emoji>=2.0.0` - Emoji handling utilities
+  </Step>
+
+  <Step title="Verify installation">
+    Test that fluxer.py is properly installed:
+
+    ```python
+    import fluxer
+    print(fluxer.__version__)
+    ```
+
+    You should see the version number (currently `0.4.1`) printed to the console.
+  </Step>
+</Steps>
+
+## Voice Support Installation
+
+If you plan to use voice features in your bot, you'll need to install the optional voice dependencies and FFmpeg.
+
+<Steps>
+  <Step title="Install voice extras">
+    Install fluxer.py with the voice extra to get LiveKit support:
+
+    <CodeGroup>
+      ```bash pip
+      pip install fluxer.py[voice]
+      ```
+
+      ```bash uv
+      uv add fluxer.py --extra voice
+      ```
+    </CodeGroup>
+
+    This installs `livekit>=0.17.0` which is required for voice functionality.
+  </Step>
+
+  <Step title="Install FFmpeg">
+    FFmpeg must be installed separately and available on your system's `PATH`.
+
+    <Info>
+      FFmpeg is required for encoding and decoding audio. Make sure it's accessible from your command line.
+    </Info>
+
+    ### macOS
+
+    Using [Homebrew](https://brew.sh/):
+
+    ```bash
+    brew install ffmpeg
+    ```
+
+    ### Linux (Debian/Ubuntu)
+
+    ```bash
+    apt install ffmpeg
+    ```
+
+    ### Windows
+
+    Using [Chocolatey](https://chocolatey.org/install):
+
+    ```bash
+    choco install ffmpeg
+    ```
+
+    <Note>
+      Alternatively on Windows, you can download FFmpeg manually from [ffmpeg.org](https://ffmpeg.org/download.html) and add it to your PATH.
+    </Note>
+  </Step>
+
+  <Step title="Verify FFmpeg installation">
+    Check that FFmpeg is properly installed and accessible:
+
+    ```bash
+    ffmpeg -version
+    ```
+
+    You should see version information for FFmpeg, ffprobe, and the libraries it was built with.
+  </Step>
+</Steps>
+
+## Development Installation
+
+If you want to contribute to fluxer.py or need the latest development version, you can install directly from the source repository.
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/akarealemil/fluxer.py.git
+    cd fluxer.py
+    ```
+  </Step>
+
+  <Step title="Install in development mode">
+    <CodeGroup>
+      ```bash pip
+      pip install -e .
+      ```
+
+      ```bash uv (recommended)
+      uv sync --dev
+      ```
+    </CodeGroup>
+
+    <Info>
+      The `uv sync --dev` command will create a `.venv` virtual environment and install all development dependencies including pytest, pyright, and ruff.
+    </Info>
+  </Step>
+
+  <Step title="Verify development setup">
+    Run the test suite to ensure everything is working:
+
+    ```bash
+    pytest
+    ```
+  </Step>
+</Steps>
+
+## Dependencies Overview
+
+### Core Dependencies
+
+Installed with the base package:
+
+| Package | Version | Purpose |
+|---------|---------|----------|
+| aiohttp | 3.9.0+ | Async HTTP client for REST API |
+| emoji | 2.0.0+ | Emoji handling and utilities |
+
+### Optional Dependencies
+
+Installed with `[voice]` extra:
+
+| Package | Version | Purpose |
+|---------|---------|----------|
+| livekit | >=0.17.0 | Voice connection and audio streaming |
+
+### Development Dependencies
+
+Installed with `uv sync --dev`:
+
+| Package | Purpose |
+|---------|----------|
+| pytest | Testing framework |
+| pytest-asyncio | Async test support |
+| pytest-cov | Code coverage reporting |
+| pyright | Static type checker |
+| ruff | Fast Python linter and formatter |
+
+## Troubleshooting
+
+<Warning>
+  If you encounter issues with voice support, ensure both the `livekit` package and `ffmpeg` binary are properly installed. The voice features will not work if either is missing.
+</Warning>
+
+### Common Issues
+
+**Import Error: No module named 'livekit'**
+- Solution: Install the voice extras with `pip install fluxer.py[voice]`
+
+**FFmpeg not found**
+- Solution: Ensure FFmpeg is installed and added to your system's PATH environment variable
+
+**Python version incompatibility**
+- Solution: Upgrade to Python 3.10 or higher. The library will not work with older Python versions.
+
+## Next Steps
+
+Now that you have fluxer.py installed, you're ready to create your first bot!
+
+<Card title="Quickstart Guide" icon="rocket" href="/quickstart">
+  Learn how to create a simple bot with commands and events
+</Card>

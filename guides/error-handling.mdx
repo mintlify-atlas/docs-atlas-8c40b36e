@@ -1,0 +1,484 @@
+---
+title: Error Handling
+description: Handle exceptions and errors in your Fluxer bot
+---
+
+fluxer.py provides a structured exception hierarchy to help you handle errors gracefully in your bot.
+
+## Exception Hierarchy
+
+All library exceptions inherit from `FluxerException`, making it easy to catch all fluxer.py errors.
+
+```python
+from fluxer.errors import FluxerException
+
+try:
+    await bot.fetch_user("invalid_id")
+except FluxerException as e:
+    print(f"Fluxer error: {e}")
+```
+
+### Base Exception
+
+```python
+class FluxerException(Exception):
+    """Base exception for all fluxer.py errors."""
+```
+
+All other exceptions in fluxer.py inherit from this class.
+
+## HTTP Exceptions
+
+HTTP exceptions are raised when API requests fail. They map to standard HTTP status codes.
+
+### HTTPException
+
+The base class for all HTTP-related errors.
+
+```python
+class HTTPException(FluxerException):
+    """Raised when an HTTP request to the Fluxer API fails."""
+
+    def __init__(
+        self,
+        status: int,
+        code: str,
+        message: str,
+        errors: list[dict[str, Any]] | None = None,
+    ):
+        self.status = status
+        self.code = code
+        self.message = message
+        self.errors = errors or []
+        super().__init__(f"{status} {code}: {message}")
+```
+
+**Attributes:**
+- `status`: HTTP status code (400, 403, 404, etc.)
+- `code`: Fluxer error code (e.g., "MISSING_PERMISSIONS")
+- `message`: Human-readable error description
+- `errors`: List of validation errors (if applicable)
+
+### BadRequest (400)
+
+Raised when the request contains invalid data.
+
+```python
+class BadRequest(HTTPException):
+    """400 Bad Request — invalid input."""
+```
+
+**Example:**
+```python
+from fluxer.errors import BadRequest
+
+try:
+    await channel.send(content="")  # Empty message
+except BadRequest as e:
+    print(f"Invalid request: {e.message}")
+```
+
+### Unauthorized (401)
+
+Raised when the bot token is invalid or missing.
+
+```python
+class Unauthorized(HTTPException):
+    """401 Unauthorized — bad or missing token."""
+```
+
+**Example:**
+```python
+from fluxer.errors import Unauthorized
+
+try:
+    bot.run("invalid_token")
+except Unauthorized:
+    print("Invalid bot token!")
+```
+
+### Forbidden (403)
+
+Raised when the bot lacks permissions to perform an action.
+
+```python
+class Forbidden(HTTPException):
+    """403 Forbidden — missing permissions."""
+```
+
+**Example:**
+```python
+from fluxer.errors import Forbidden
+
+@bot.command()
+async def ban(ctx, user_id: int):
+    try:
+        await ctx.guild.ban_member(user_id)
+    except Forbidden:
+        await ctx.reply("I don't have permission to ban members!")
+```
+
+### NotFound (404)
+
+Raised when a resource doesn't exist.
+
+```python
+class NotFound(HTTPException):
+    """404 Not Found — resource doesn't exist."""
+```
+
+**Example:**
+```python
+from fluxer.errors import NotFound
+
+@bot.command()
+async def user(ctx, user_id: int):
+    try:
+        user = await bot.fetch_user(str(user_id))
+        await ctx.reply(f"Found: {user.username}")
+    except NotFound:
+        await ctx.reply("User not found.")
+```
+
+### RateLimited (429)
+
+Raised when the bot exceeds rate limits.
+
+```python
+class RateLimited(HTTPException):
+    """429 Too Many Requests — slow down."""
+
+    def __init__(self, retry_after: float, **kwargs: Any):
+        self.retry_after = retry_after
+        super().__init__(
+            status=429,
+            code="RATE_LIMITED",
+            message=f"Rate limited, retry after {retry_after}s",
+        )
+```
+
+**Attributes:**
+- `retry_after`: Seconds to wait before retrying
+
+**Example:**
+```python
+from fluxer.errors import RateLimited
+import asyncio
+
+try:
+    await channel.send("Message")
+except RateLimited as e:
+    print(f"Rate limited! Retry after {e.retry_after}s")
+    await asyncio.sleep(e.retry_after)
+```
+
+<Note>
+fluxer.py automatically handles rate limits with retries. You typically don't need to catch `RateLimited` unless you want custom retry logic.
+</Note>
+
+## Gateway Exceptions
+
+Gateway exceptions relate to WebSocket connection issues.
+
+### GatewayException
+
+Base class for all gateway/WebSocket errors.
+
+```python
+class GatewayException(FluxerException):
+    """Base for gateway/WebSocket errors."""
+```
+
+### GatewayNotConnected
+
+Raised when attempting to use the gateway before it's connected.
+
+```python
+class GatewayNotConnected(GatewayException):
+    """Raised when trying to use the gateway before it's connected."""
+```
+
+**Example:**
+```python
+from fluxer.errors import GatewayNotConnected
+
+try:
+    await gateway.send({"op": 1})
+except GatewayNotConnected:
+    print("Gateway not connected yet!")
+```
+
+### ReconnectRequested
+
+Raised when the gateway requests a reconnection.
+
+```python
+class ReconnectRequested(GatewayException):
+    """The gateway has requested we reconnect."""
+```
+
+<Note>
+fluxer.py handles reconnections automatically. This exception is mostly internal.
+</Note>
+
+### SessionInvalid
+
+Raised when the session is invalid and cannot be resumed.
+
+```python
+class SessionInvalid(GatewayException):
+    """The session is invalid and cannot be resumed."""
+
+    def __init__(self, resumable: bool = False):
+        self.resumable = resumable
+        super().__init__(f"Invalid session (resumable={resumable})")
+```
+
+**Attributes:**
+- `resumable`: Whether the session can be resumed
+
+## Client Exceptions
+
+### LoginFailure
+
+Raised when the bot token is invalid during login.
+
+```python
+class LoginFailure(FluxerException):
+    """Raised when the bot token is invalid."""
+```
+
+**Example:**
+```python
+from fluxer.errors import LoginFailure
+
+try:
+    bot.run("bad_token")
+except LoginFailure:
+    print("Failed to login. Check your token!")
+```
+
+## Handling Errors in Commands
+
+You can handle errors at different levels in your bot.
+
+### Per-Command Error Handling
+
+Catch specific exceptions within individual commands.
+
+```python
+from fluxer.errors import Forbidden, NotFound, HTTPException
+
+@bot.command()
+async def kick(ctx, user_id: int):
+    try:
+        await ctx.guild.kick_member(user_id)
+        await ctx.reply(f"Kicked user {user_id}")
+    except Forbidden:
+        await ctx.reply("I don't have permission to kick members!")
+    except NotFound:
+        await ctx.reply("User not found in this guild.")
+    except HTTPException as e:
+        await ctx.reply(f"API error: {e.message}")
+```
+
+### Global Error Handler
+
+Handle errors globally using the `on_command_error` event.
+
+```python
+from fluxer.errors import (
+    Forbidden,
+    NotFound,
+    BadRequest,
+    HTTPException,
+    FluxerException
+)
+
+@bot.event
+async def on_command_error(ctx, error):
+    """Global error handler for all commands."""
+    if isinstance(error, Forbidden):
+        await ctx.reply("I don't have permission to do that.")
+    elif isinstance(error, NotFound):
+        await ctx.reply("Resource not found.")
+    elif isinstance(error, BadRequest):
+        await ctx.reply(f"Invalid request: {error.message}")
+    elif isinstance(error, HTTPException):
+        await ctx.reply(f"API error ({error.status}): {error.message}")
+    elif isinstance(error, FluxerException):
+        await ctx.reply(f"Fluxer error: {error}")
+    else:
+        # Unexpected error
+        await ctx.reply("An unexpected error occurred.")
+        raise error  # Re-raise for logging
+```
+
+<Warning>
+Always re-raise unexpected errors in your error handler to ensure they're logged and debugged.
+</Warning>
+
+## Validation Errors
+
+Some HTTP exceptions include detailed validation errors in the `errors` attribute.
+
+```python
+try:
+    await channel.send(content="x" * 3000)  # Message too long
+except BadRequest as e:
+    print(f"Status: {e.status}")
+    print(f"Code: {e.code}")
+    print(f"Message: {e.message}")
+
+    if e.errors:
+        for error in e.errors:
+            print(f"Field: {error.get('field')}")
+            print(f"Error: {error.get('message')}")
+```
+
+## Exception Factory
+
+fluxer.py uses a factory function to create the appropriate exception subclass.
+
+```python
+def http_exception_from_status(
+    status: int, code: str, message: str, **kwargs: Any
+) -> HTTPException:
+    """Factory to create the right HTTPException subclass for a status code."""
+    cls = _STATUS_MAP.get(status, HTTPException)
+    if cls is RateLimited:
+        return RateLimited(retry_after=kwargs.get("retry_after", 0.0))
+    return cls(status=status, code=code, message=message, errors=kwargs.get("errors"))
+```
+
+This maps HTTP status codes to specific exception classes:
+
+```python
+_STATUS_MAP: dict[int, type[HTTPException]] = {
+    400: BadRequest,
+    401: Unauthorized,
+    403: Forbidden,
+    404: NotFound,
+    429: RateLimited,
+}
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="Catch specific exceptions first">
+    Handle specific exceptions (like `Forbidden`) before generic ones (like `HTTPException`).
+
+    ```python
+    try:
+        await action()
+    except Forbidden:
+        # Handle permission errors
+        pass
+    except HTTPException:
+        # Handle other HTTP errors
+        pass
+    ```
+  </Step>
+
+  <Step title="Use global error handlers">
+    Implement `on_command_error` to avoid repeating error handling in every command.
+  </Step>
+
+  <Step title="Log unexpected errors">
+    Always log or re-raise unexpected exceptions for debugging.
+
+    ```python
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        await action()
+    except FluxerException as e:
+        logger.error(f"Fluxer error: {e}")
+    except Exception as e:
+        logger.exception("Unexpected error")
+        raise
+    ```
+  </Step>
+
+  <Step title="Provide helpful messages">
+    Give users clear, actionable feedback when errors occur.
+
+    ```python
+    except Forbidden:
+        await ctx.reply(
+            "I need the 'Ban Members' permission to use this command."
+        )
+    ```
+  </Step>
+</Steps>
+
+## Complete Example
+
+Here's a complete bot with comprehensive error handling:
+
+```python
+import fluxer
+from fluxer.errors import (
+    Forbidden,
+    NotFound,
+    BadRequest,
+    HTTPException,
+    FluxerException,
+    LoginFailure,
+)
+import logging
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+@bot.command()
+async def ban(ctx, user_id: int, *, reason: str = None):
+    """Ban a user from the server."""
+    try:
+        await ctx.guild.ban_member(user_id, reason=reason)
+        await ctx.reply(f"Banned user {user_id}")
+    except Forbidden:
+        await ctx.reply("I don't have permission to ban members.")
+    except NotFound:
+        await ctx.reply("User not found.")
+
+@bot.command()
+async def userinfo(ctx, user_id: int):
+    """Get information about a user."""
+    try:
+        user = await bot.fetch_user(str(user_id))
+        await ctx.reply(f"Username: {user.username}")
+    except NotFound:
+        await ctx.reply(f"User {user_id} not found.")
+
+@bot.event
+async def on_command_error(ctx, error):
+    """Global error handler."""
+    if isinstance(error, Forbidden):
+        await ctx.reply("I don't have permission to do that.")
+    elif isinstance(error, NotFound):
+        await ctx.reply("Resource not found.")
+    elif isinstance(error, BadRequest):
+        await ctx.reply(f"Invalid request: {error.message}")
+    elif isinstance(error, HTTPException):
+        await ctx.reply(f"API error: {error.message}")
+        logger.error(f"HTTP {error.status}: {error.message}")
+    elif isinstance(error, FluxerException):
+        await ctx.reply("A Fluxer error occurred.")
+        logger.error(f"Fluxer error: {error}")
+    else:
+        await ctx.reply("An unexpected error occurred.")
+        logger.exception("Unexpected error", exc_info=error)
+
+try:
+    bot.run("YOUR_BOT_TOKEN")
+except LoginFailure:
+    logger.error("Failed to login. Invalid token!")
+except Exception as e:
+    logger.exception("Fatal error")
+```

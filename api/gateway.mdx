@@ -1,0 +1,302 @@
+---
+title: "Gateway"
+description: "WebSocket connection manager for the Fluxer Gateway"
+---
+
+## Overview
+
+The `Gateway` class manages the WebSocket connection to the Fluxer Gateway. It handles the full lifecycle: connect, heartbeat, identify, dispatch events, and reconnect on failure.
+
+<Note>
+  Most users don't need to interact with the Gateway directly. The `Client` and `Bot` classes handle gateway management automatically.
+</Note>
+
+## Gateway
+
+### Constructor
+
+```python
+from fluxer.gateway import Gateway
+from fluxer.enums import Intents
+
+gateway = Gateway(
+    http_client=http,
+    token="your_token",
+    intents=Intents.default(),
+    dispatch=dispatch_callback
+)
+```
+
+#### Parameters
+
+<ParamField path="http_client" type="Any" required>
+  HTTPClient instance for making API requests
+</ParamField>
+
+<ParamField path="token" type="str" required>
+  Bot token for authentication
+</ParamField>
+
+<ParamField path="intents" type="Intents" required>
+  Gateway intents to request
+</ParamField>
+
+<ParamField path="dispatch" type="Callable[[str, Any], Coroutine[Any, Any, None]]" required>
+  Async callback function to handle dispatch events. Called with (event_name, data).
+</ParamField>
+
+### Properties
+
+#### is_connected
+
+```python
+gateway.is_connected -> bool
+```
+
+Returns True if the WebSocket is connected and not closed.
+
+## Core Methods
+
+### connect()
+
+```python
+await gateway.connect()
+```
+
+Establish the gateway connection and enter the event loop. This method runs indefinitely until the connection is closed or an unrecoverable error occurs.
+
+### close()
+
+```python
+await gateway.close()
+```
+
+Gracefully close the gateway connection. This stops the heartbeat, closes the WebSocket, and cleans up the session.
+
+## Presence Methods
+
+### update_presence()
+
+```python
+await gateway.update_presence(
+    status="online",
+    activity_name=None,
+    activity_type=0
+)
+```
+
+Update the bot's presence/status.
+
+<ParamField path="status" type="str" default="online">
+  The bot's status. Can be "online", "idle", "dnd", or "invisible".
+</ParamField>
+
+<ParamField path="activity_name" type="str | None">
+  The activity name to display (e.g., "Playing Minecraft")
+</ParamField>
+
+<ParamField path="activity_type" type="int" default="0">
+  The activity type:
+  - 0: Playing
+  - 1: Streaming
+  - 2: Listening
+  - 3: Watching
+  - 5: Competing
+</ParamField>
+
+**Example:**
+```python
+# Set status to "Playing Minecraft"
+await gateway.update_presence(
+    status="online",
+    activity_name="Minecraft",
+    activity_type=0
+)
+
+# Set status to "Listening to Music"
+await gateway.update_presence(
+    status="online",
+    activity_name="Music",
+    activity_type=2
+)
+```
+
+### update_voice_state()
+
+```python
+await gateway.update_voice_state(
+    guild_id="123456789",
+    channel_id="987654321",
+    self_mute=False,
+    self_deaf=False
+)
+```
+
+Update the bot's voice state (join/leave voice channels).
+
+<ParamField path="guild_id" type="str" required>
+  The guild ID
+</ParamField>
+
+<ParamField path="channel_id" type="str | None">
+  The voice channel ID to join, or None to leave voice
+</ParamField>
+
+<ParamField path="self_mute" type="bool" default="False">
+  Whether to mute yourself
+</ParamField>
+
+<ParamField path="self_deaf" type="bool" default="False">
+  Whether to deafen yourself
+</ParamField>
+
+## GatewayPayload
+
+Represents a Gateway payload (sent or received). All gateway messages follow this structure.
+
+### Constructor
+
+```python
+from fluxer.gateway import GatewayPayload
+
+payload = GatewayPayload(
+    op=0,
+    d={"event": "data"},
+    s=42,
+    t="MESSAGE_CREATE"
+)
+```
+
+#### Parameters
+
+<ParamField path="op" type="int" required>
+  Opcode (operation code)
+</ParamField>
+
+<ParamField path="d" type="Any">
+  Event data (dict, int, or None)
+</ParamField>
+
+<ParamField path="s" type="int | None">
+  Sequence number (only for op 0 DISPATCH)
+</ParamField>
+
+<ParamField path="t" type="str | None">
+  Event name (only for op 0 DISPATCH)
+</ParamField>
+
+### Methods
+
+#### from_json()
+
+```python
+payload = GatewayPayload.from_json(json_string)
+```
+
+Parse a JSON string into a GatewayPayload.
+
+<ParamField path="raw" type="str" required>
+  JSON string to parse
+</ParamField>
+
+<ResponseField name="return" type="GatewayPayload">
+  Parsed payload object
+</ResponseField>
+
+#### to_json()
+
+```python
+json_string = payload.to_json()
+```
+
+Serialize the payload to a JSON string.
+
+<ResponseField name="return" type="str">
+  JSON representation of the payload
+</ResponseField>
+
+## Gateway Opcodes
+
+The gateway uses opcodes to identify different message types:
+
+- **0 (DISPATCH)**: Server dispatching an event
+- **1 (HEARTBEAT)**: Client sending heartbeat
+- **2 (IDENTIFY)**: Client identifying a new session
+- **6 (RESUME)**: Client resuming a session
+- **7 (RECONNECT)**: Server requesting reconnect
+- **9 (INVALID_SESSION)**: Server rejecting session
+- **10 (HELLO)**: Server sending connection acknowledgment
+- **11 (HEARTBEAT_ACK)**: Server acknowledging heartbeat
+
+## Gateway Events
+
+The gateway dispatches events via the `dispatch` callback. Common events include:
+
+- **READY**: Initial state is sent when connection is established
+- **RESUMED**: Session was successfully resumed
+- **MESSAGE_CREATE**: A message was created
+- **MESSAGE_UPDATE**: A message was edited
+- **MESSAGE_DELETE**: A message was deleted
+- **GUILD_CREATE**: Guild became available or user joined a guild
+- **GUILD_DELETE**: Guild became unavailable or user left/was removed
+- **CHANNEL_CREATE**: Channel was created
+- **CHANNEL_UPDATE**: Channel was updated
+- **CHANNEL_DELETE**: Channel was deleted
+- **VOICE_STATE_UPDATE**: User's voice state changed
+- **VOICE_SERVER_UPDATE**: Guild's voice server was updated
+
+## Connection Lifecycle
+
+The Gateway handles the following lifecycle:
+
+1. **Connect**: Establish WebSocket connection
+2. **Hello**: Receive HELLO with heartbeat interval
+3. **Identify/Resume**: Send IDENTIFY (new session) or RESUME (existing session)
+4. **Ready**: Receive READY with session info
+5. **Heartbeat**: Periodically send heartbeats to keep connection alive
+6. **Dispatch**: Receive and process events
+7. **Reconnect**: Handle disconnections and resume session when possible
+8. **Close**: Gracefully close connection
+
+## Error Handling
+
+The Gateway automatically handles:
+
+- **Rate limiting**: Respects heartbeat intervals
+- **Reconnection**: Automatically reconnects on connection loss
+- **Session resumption**: Resumes sessions when possible to avoid re-fetching state
+- **Invalid sessions**: Starts new session when resume fails
+- **Close codes**: Interprets gateway close codes to determine if reconnection is possible
+
+## Example Usage
+
+```python
+from fluxer.gateway import Gateway
+from fluxer.http import HTTPClient
+from fluxer.enums import Intents
+
+async def dispatch_handler(event_name: str, data: dict):
+    print(f"Event: {event_name}")
+    print(f"Data: {data}")
+
+async def main():
+    token = "your_token"
+    http = HTTPClient(token)
+    
+    gateway = Gateway(
+        http_client=http,
+        token=token,
+        intents=Intents.default(),
+        dispatch=dispatch_handler
+    )
+    
+    try:
+        await gateway.connect()
+    finally:
+        await gateway.close()
+        await http.close()
+```
+
+<Note>
+  In practice, you should use the `Client` or `Bot` classes instead of manually managing the Gateway. They provide a higher-level interface with event handlers, caching, and more.
+</Note>

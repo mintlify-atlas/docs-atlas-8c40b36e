@@ -1,0 +1,615 @@
+---
+title: "HTTPClient"
+description: "Async HTTP client for the Fluxer REST API"
+---
+
+## Overview
+
+The `HTTPClient` class provides an async HTTP client for interacting with the Fluxer REST API. It handles rate limiting, retries, error mapping, and authentication.
+
+## HTTPClient
+
+### Constructor
+
+```python
+from fluxer.http import HTTPClient
+
+http = HTTPClient(
+    token="your_token",
+    is_bot=True,
+    api_url="https://api.fluxer.app/v1",
+    max_retries=4,
+    retry_forever=False
+)
+```
+
+#### Parameters
+
+<ParamField path="token" type="str" required>
+  Bot or user token
+</ParamField>
+
+<ParamField path="is_bot" type="bool" default="True">
+  Whether this is a bot token (adds "Bot" prefix to auth header)
+</ParamField>
+
+<ParamField path="api_url" type="str" default="https://api.fluxer.app/v1">
+  Base URL for the API. Use this to connect to self-hosted Fluxer instances.
+</ParamField>
+
+<ParamField path="max_retries" type="int" default="4">
+  Maximum number of retries for failed requests
+</ParamField>
+
+<ParamField path="retry_forever" type="bool" default="False">
+  Whether to retry requests indefinitely
+</ParamField>
+
+### Core Methods
+
+#### request()
+
+```python
+await http.request(route, json=None, data=None, params=None, reason=None)
+```
+
+Make an authenticated request to the Fluxer API. Handles rate limiting, retries on 429/5xx, connection errors, and error mapping.
+
+<ParamField path="route" type="Route" required>
+  The API route to request
+</ParamField>
+
+<ParamField path="json" type="Any">
+  JSON payload to send
+</ParamField>
+
+<ParamField path="data" type="aiohttp.FormData | None">
+  Form data to send (for file uploads)
+</ParamField>
+
+<ParamField path="params" type="dict[str, Any] | None">
+  Query parameters
+</ParamField>
+
+<ParamField path="reason" type="str | None">
+  Reason for audit log (sent in X-Audit-Log-Reason header)
+</ParamField>
+
+<ResponseField name="return" type="Any">
+  Parsed JSON response, or None for 204 No Content
+</ResponseField>
+
+#### close()
+
+```python
+await http.close()
+```
+
+Close the underlying HTTP session.
+
+### Context Manager
+
+```python
+async with HTTPClient(token) as http:
+    data = await http.request(Route("GET", "/users/@me"))
+```
+
+### Gateway Endpoints
+
+#### get_gateway()
+
+```python
+await http.get_gateway()
+```
+
+GET /gateway/bot — get the WebSocket URL.
+
+<ResponseField name="return" type="dict[str, Any]">
+  Gateway data with url field
+</ResponseField>
+
+#### get_gateway_bot()
+
+```python
+await http.get_gateway_bot()
+```
+
+GET /gateway/bot — get gateway URL + sharding info.
+
+<ResponseField name="return" type="dict[str, Any]">
+  Gateway data with url, shards, and session_start_limit
+</ResponseField>
+
+### User Endpoints
+
+#### get_current_user()
+
+```python
+await http.get_current_user()
+```
+
+GET /users/@me
+
+<ResponseField name="return" type="dict[str, Any]">
+  Current user object
+</ResponseField>
+
+#### get_user()
+
+```python
+await http.get_user(user_id)
+```
+
+GET /users/{user_id}
+
+<ParamField path="user_id" type="int | str" required>
+  The user ID
+</ParamField>
+
+<ResponseField name="return" type="dict[str, Any]">
+  User object
+</ResponseField>
+
+#### get_user_profile()
+
+```python
+await http.get_user_profile(user_id, guild_id=None)
+```
+
+GET /users/{user_id}/profile — Get a user's full profile with bio, pronouns, banner, etc.
+
+<ParamField path="user_id" type="int | str" required>
+  The user ID to fetch
+</ParamField>
+
+<ParamField path="guild_id" type="int | str | None">
+  Optional guild ID for guild-specific profile data
+</ParamField>
+
+<ResponseField name="return" type="dict[str, Any]">
+  Profile object with user, user_profile, premium data
+</ResponseField>
+
+#### create_dm()
+
+```python
+await http.create_dm(user_id)
+```
+
+POST /users/@me/channels — Open a DM channel with a user.
+
+<ParamField path="user_id" type="int | str" required>
+  The ID of the user to open a DM with
+</ParamField>
+
+<ResponseField name="return" type="dict[str, Any]">
+  Channel object for the DM channel
+</ResponseField>
+
+#### modify_current_user()
+
+```python
+await http.modify_current_user(username=None, avatar=None, banner=None)
+```
+
+PATCH /users/@me — Modify the current user's profile.
+
+<ParamField path="username" type="str | None">
+  New username
+</ParamField>
+
+<ParamField path="avatar" type="bytes | None">
+  Avatar image data (PNG/JPG/GIF)
+</ParamField>
+
+<ParamField path="banner" type="bytes | None">
+  Banner image data (PNG/JPG/GIF)
+</ParamField>
+
+<ResponseField name="return" type="dict[str, Any]">
+  Updated user object
+</ResponseField>
+
+### Channel Endpoints
+
+#### get_channel()
+
+```python
+await http.get_channel(channel_id)
+```
+
+GET /channels/{channel_id}
+
+<ParamField path="channel_id" type="int | str" required>
+  The channel ID
+</ParamField>
+
+<ResponseField name="return" type="dict[str, Any]">
+  Channel object
+</ResponseField>
+
+#### modify_channel()
+
+```python
+await http.modify_channel(channel_id, name=None, type=None, topic=None, position=None, parent_id=None, nsfw=None)
+```
+
+PATCH /channels/{channel_id}
+
+<ParamField path="channel_id" type="int | str" required>
+  The channel ID
+</ParamField>
+
+<ParamField path="name" type="str | None">
+  New channel name
+</ParamField>
+
+<ParamField path="type" type="int | None">
+  Channel type
+</ParamField>
+
+<ParamField path="topic" type="str | None">
+  Channel topic
+</ParamField>
+
+<ParamField path="position" type="int | None">
+  Channel position
+</ParamField>
+
+<ParamField path="parent_id" type="int | str | None">
+  Parent category ID
+</ParamField>
+
+<ParamField path="nsfw" type="bool | None">
+  Whether the channel is NSFW
+</ParamField>
+
+<ResponseField name="return" type="dict[str, Any]">
+  Updated channel object
+</ResponseField>
+
+#### delete_channel()
+
+```python
+await http.delete_channel(channel_id)
+```
+
+DELETE /channels/{channel_id}
+
+<ParamField path="channel_id" type="int | str" required>
+  The channel ID
+</ParamField>
+
+### Message Endpoints
+
+#### send_message()
+
+```python
+await http.send_message(
+    channel_id,
+    content=None,
+    embed=None,
+    embeds=None,
+    files=None,
+    message_reference=None
+)
+```
+
+POST /channels/{channel_id}/messages
+
+<ParamField path="channel_id" type="int | str" required>
+  The channel to send the message to
+</ParamField>
+
+<ParamField path="content" type="str | None">
+  The message content
+</ParamField>
+
+<ParamField path="embed" type="Any | None">
+  Single embed object
+</ParamField>
+
+<ParamField path="embeds" type="list[Any] | None">
+  List of embed objects (Embed or dict)
+</ParamField>
+
+<ParamField path="files" type="list[Any] | None">
+  List of file objects to attach
+</ParamField>
+
+<ParamField path="message_reference" type="dict[str, Any] | None">
+  Reference to another message for replies. Example: `{"message_id": "123456789", "channel_id": "987654321"}`
+</ParamField>
+
+<ResponseField name="return" type="dict[str, Any]">
+  Created message object
+</ResponseField>
+
+#### get_message()
+
+```python
+await http.get_message(channel_id, message_id)
+```
+
+GET /channels/{channel_id}/messages/{message_id} — Fetch a single message
+
+<ParamField path="channel_id" type="int | str" required>
+  The channel ID
+</ParamField>
+
+<ParamField path="message_id" type="int | str" required>
+  The message ID
+</ParamField>
+
+<ResponseField name="return" type="dict[str, Any]">
+  Message object
+</ResponseField>
+
+#### get_messages()
+
+```python
+await http.get_messages(channel_id, limit=50, before=None, after=None)
+```
+
+GET /channels/{channel_id}/messages
+
+<ParamField path="channel_id" type="int | str" required>
+  The channel ID
+</ParamField>
+
+<ParamField path="limit" type="int" default="50">
+  Number of messages to fetch (1-100)
+</ParamField>
+
+<ParamField path="before" type="int | str | None">
+  Get messages before this message ID
+</ParamField>
+
+<ParamField path="after" type="int | str | None">
+  Get messages after this message ID
+</ParamField>
+
+<ResponseField name="return" type="list[dict[str, Any]]">
+  List of message objects
+</ResponseField>
+
+#### edit_message()
+
+```python
+await http.edit_message(channel_id, message_id, content=None, embeds=None)
+```
+
+PATCH /channels/{channel_id}/messages/{message_id}
+
+<ParamField path="channel_id" type="int | str" required>
+  The channel ID
+</ParamField>
+
+<ParamField path="message_id" type="int | str" required>
+  The message ID
+</ParamField>
+
+<ParamField path="content" type="str | None">
+  New message content
+</ParamField>
+
+<ParamField path="embeds" type="list[dict[str, Any]] | None">
+  New embeds
+</ParamField>
+
+<ResponseField name="return" type="dict[str, Any]">
+  Updated message object
+</ResponseField>
+
+#### delete_message()
+
+```python
+await http.delete_message(channel_id, message_id)
+```
+
+DELETE /channels/{channel_id}/messages/{message_id}
+
+<ParamField path="channel_id" type="int | str" required>
+  The channel ID
+</ParamField>
+
+<ParamField path="message_id" type="int | str" required>
+  The message ID
+</ParamField>
+
+### Guild Endpoints
+
+#### get_guild()
+
+```python
+await http.get_guild(guild_id)
+```
+
+GET /guilds/{guild_id}
+
+<ParamField path="guild_id" type="int | str" required>
+  The guild ID
+</ParamField>
+
+<ResponseField name="return" type="dict[str, Any]">
+  Guild object
+</ResponseField>
+
+#### create_guild()
+
+```python
+await http.create_guild(name="My Guild", icon=None)
+```
+
+POST /guilds — Create a new guild.
+
+<ParamField path="name" type="str" required>
+  Guild name (2-100 characters)
+</ParamField>
+
+<ParamField path="icon" type="bytes | None">
+  Icon image data (PNG/JPG/GIF)
+</ParamField>
+
+<ResponseField name="return" type="dict[str, Any]">
+  Guild object
+</ResponseField>
+
+#### modify_guild()
+
+```python
+await http.modify_guild(guild_id, name=None, icon=None, **kwargs)
+```
+
+PATCH /guilds/{guild_id} — Modify guild settings.
+
+<ParamField path="guild_id" type="int | str" required>
+  The guild ID
+</ParamField>
+
+<ParamField path="name" type="str | None">
+  New guild name
+</ParamField>
+
+<ParamField path="icon" type="bytes | None">
+  New icon image data
+</ParamField>
+
+<ResponseField name="return" type="dict[str, Any]">
+  Updated guild object
+</ResponseField>
+
+#### delete_guild()
+
+```python
+await http.delete_guild(guild_id)
+```
+
+DELETE /guilds/{guild_id}
+
+<ParamField path="guild_id" type="int | str" required>
+  The guild ID
+</ParamField>
+
+### Reaction Endpoints
+
+#### add_reaction()
+
+```python
+await http.add_reaction(channel_id, message_id, emoji)
+```
+
+PUT /channels/{channel_id}/messages/{message_id}/reactions/{emoji}/@me
+
+<ParamField path="channel_id" type="int | str" required>
+  Channel ID
+</ParamField>
+
+<ParamField path="message_id" type="int | str" required>
+  Message ID
+</ParamField>
+
+<ParamField path="emoji" type="Any" required>
+  Emoji to react with (PartialEmoji, Emoji, or unicode string)
+</ParamField>
+
+#### delete_reaction()
+
+```python
+await http.delete_reaction(channel_id, message_id, emoji, user_id="@me")
+```
+
+DELETE /channels/{channel_id}/messages/{message_id}/reactions/{emoji}/{user_id}
+
+<ParamField path="channel_id" type="int | str" required>
+  Channel ID
+</ParamField>
+
+<ParamField path="message_id" type="int | str" required>
+  Message ID
+</ParamField>
+
+<ParamField path="emoji" type="Any" required>
+  Emoji to remove
+</ParamField>
+
+<ParamField path="user_id" type="int | str" default="@me">
+  User ID to remove reaction from
+</ParamField>
+
+#### delete_all_reactions()
+
+```python
+await http.delete_all_reactions(channel_id, message_id)
+```
+
+DELETE /channels/{channel_id}/messages/{message_id}/reactions
+
+<ParamField path="channel_id" type="int | str" required>
+  Channel ID
+</ParamField>
+
+<ParamField path="message_id" type="int | str" required>
+  Message ID
+</ParamField>
+
+## Route
+
+Represents an API route. Used for rate limit bucketing.
+
+### Constructor
+
+```python
+from fluxer.http import Route
+
+route = Route(
+    "GET",
+    "/channels/{channel_id}/messages",
+    channel_id="123",
+    base_url="https://api.fluxer.app/v1"
+)
+```
+
+#### Parameters
+
+<ParamField path="method" type="str" required>
+  HTTP method (GET, POST, PATCH, DELETE, etc.)
+</ParamField>
+
+<ParamField path="path" type="str" required>
+  API path with placeholders (e.g., "/channels/{channel_id}/messages")
+</ParamField>
+
+<ParamField path="base_url" type="str" default="https://api.fluxer.app/v1">
+  Base URL for the API
+</ParamField>
+
+<ParamField path="**params" type="Any">
+  URL parameters to substitute into the path
+</ParamField>
+
+### Properties
+
+- `url` - Full URL with parameters substituted
+- `bucket` - Rate limit bucket key
+
+## Example Usage
+
+```python
+from fluxer.http import HTTPClient, Route
+
+async with HTTPClient("your_token") as http:
+    # Get current user
+    user = await http.get_current_user()
+    print(f"Logged in as {user['username']}")
+    
+    # Send a message
+    message = await http.send_message(
+        channel_id="123456789",
+        content="Hello, world!"
+    )
+    
+    # Custom route
+    route = Route("GET", "/users/@me")
+    data = await http.request(route)
+```

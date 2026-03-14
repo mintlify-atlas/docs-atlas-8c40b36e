@@ -1,0 +1,517 @@
+---
+title: Errors
+description: Exception classes and error handling in fluxer.py
+---
+
+## Overview
+
+Fluxer defines a hierarchy of exception classes to help you handle different error conditions. All fluxer exceptions inherit from `FluxerException`.
+
+## Exception Hierarchy
+
+```
+FluxerException (base)
+├── HTTPException
+│   ├── BadRequest (400)
+│   ├── Unauthorized (401)
+│   ├── Forbidden (403)
+│   ├── NotFound (404)
+│   └── RateLimited (429)
+├── GatewayException
+│   ├── GatewayNotConnected
+│   ├── ReconnectRequested
+│   └── SessionInvalid
+└── LoginFailure
+```
+
+---
+
+## Base Exception
+
+### FluxerException
+
+Base exception for all fluxer.py errors.
+
+```python
+class FluxerException(Exception):
+    """Base exception for all fluxer.py errors."""
+```
+
+**Usage:**
+
+```python
+try:
+    await bot.http.create_message(channel_id, content="Hello")
+except fluxer.FluxerException as e:
+    print(f"A fluxer error occurred: {e}")
+```
+
+---
+
+## HTTP Exceptions
+
+Raised when HTTP requests to the Fluxer API fail.
+
+### HTTPException
+
+Base class for all HTTP-related errors.
+
+```python
+class HTTPException(FluxerException):
+    """Raised when an HTTP request to the Fluxer API fails."""
+```
+
+#### Constructor
+
+```python
+def __init__(
+    self,
+    status: int,
+    code: str,
+    message: str,
+    errors: list[dict[str, Any]] | None = None,
+)
+```
+
+<ParamField path="status" type="int" required>
+  HTTP status code (e.g., 400, 403, 404)
+</ParamField>
+
+<ParamField path="code" type="str" required>
+  Error code from the API (e.g., "INVALID_TOKEN", "MISSING_PERMISSIONS")
+</ParamField>
+
+<ParamField path="message" type="str" required>
+  Human-readable error message
+</ParamField>
+
+<ParamField path="errors" type="list[dict[str, Any]] | None">
+  Optional list of validation errors
+</ParamField>
+
+#### Attributes
+
+<ResponseField name="status" type="int">
+  HTTP status code
+</ResponseField>
+
+<ResponseField name="code" type="str">
+  API error code
+</ResponseField>
+
+<ResponseField name="message" type="str">
+  Error message
+</ResponseField>
+
+<ResponseField name="errors" type="list[dict[str, Any]]">
+  List of validation errors (empty list if none)
+</ResponseField>
+
+**Example:**
+
+```python
+try:
+    await bot.http.get_channel(invalid_channel_id)
+except fluxer.HTTPException as e:
+    print(f"HTTP {e.status}: {e.message}")
+    print(f"Error code: {e.code}")
+    if e.errors:
+        print(f"Validation errors: {e.errors}")
+```
+
+---
+
+### BadRequest
+
+400 Bad Request — Invalid input was provided.
+
+```python
+class BadRequest(HTTPException):
+    """400 Bad Request — invalid input."""
+```
+
+**Example:**
+
+```python
+try:
+    await bot.http.create_message(channel_id, content="")  # Empty content
+except fluxer.BadRequest as e:
+    print(f"Invalid request: {e.message}")
+```
+
+---
+
+### Unauthorized
+
+401 Unauthorized — Bad or missing authentication token.
+
+```python
+class Unauthorized(HTTPException):
+    """401 Unauthorized — bad or missing token."""
+```
+
+**Example:**
+
+```python
+try:
+    bot = fluxer.Bot(token="invalid_token")
+    await bot.start()
+except fluxer.Unauthorized:
+    print("Invalid bot token!")
+```
+
+---
+
+### Forbidden
+
+403 Forbidden — Missing permissions to perform the action.
+
+```python
+class Forbidden(HTTPException):
+    """403 Forbidden — missing permissions."""
+```
+
+**Example:**
+
+```python
+try:
+    await bot.http.ban_guild_member(guild_id, user_id)
+except fluxer.Forbidden:
+    print("Bot doesn't have permission to ban members")
+```
+
+---
+
+### NotFound
+
+404 Not Found — The requested resource doesn't exist.
+
+```python
+class NotFound(HTTPException):
+    """404 Not Found — resource doesn't exist."""
+```
+
+**Example:**
+
+```python
+try:
+    channel = await bot.http.get_channel(99999999999)
+except fluxer.NotFound:
+    print("Channel not found")
+```
+
+---
+
+### RateLimited
+
+429 Too Many Requests — You're being rate limited.
+
+```python
+class RateLimited(HTTPException):
+    """429 Too Many Requests — slow down."""
+```
+
+#### Constructor
+
+```python
+def __init__(self, retry_after: float, **kwargs: Any)
+```
+
+<ParamField path="retry_after" type="float" required>
+  Number of seconds to wait before retrying
+</ParamField>
+
+#### Attributes
+
+<ResponseField name="retry_after" type="float">
+  Seconds to wait before making another request
+</ResponseField>
+
+**Example:**
+
+```python
+import asyncio
+
+try:
+    await bot.http.create_message(channel_id, content="Spam!")
+except fluxer.RateLimited as e:
+    print(f"Rate limited! Retry after {e.retry_after} seconds")
+    await asyncio.sleep(e.retry_after)
+    # Retry the request
+    await bot.http.create_message(channel_id, content="Spam!")
+```
+
+---
+
+## Gateway Exceptions
+
+Raised for WebSocket/gateway connection errors.
+
+### GatewayException
+
+Base class for gateway/WebSocket errors.
+
+```python
+class GatewayException(FluxerException):
+    """Base for gateway/WebSocket errors."""
+```
+
+---
+
+### GatewayNotConnected
+
+Raised when trying to use the gateway before it's connected.
+
+```python
+class GatewayNotConnected(GatewayException):
+    """Raised when trying to use the gateway before it's connected."""
+```
+
+**Example:**
+
+```python
+try:
+    await gateway.send_message({"op": 1})
+except fluxer.GatewayNotConnected:
+    print("Gateway not connected yet")
+```
+
+---
+
+### ReconnectRequested
+
+The gateway has requested a reconnect.
+
+```python
+class ReconnectRequested(GatewayException):
+    """The gateway has requested we reconnect."""
+```
+
+This is typically handled internally by the library.
+
+---
+
+### SessionInvalid
+
+The session is invalid and cannot be resumed.
+
+```python
+class SessionInvalid(GatewayException):
+    """The session is invalid and cannot be resumed."""
+```
+
+#### Constructor
+
+```python
+def __init__(self, resumable: bool = False)
+```
+
+<ParamField path="resumable" type="bool" default="False">
+  Whether the session can potentially be resumed
+</ParamField>
+
+#### Attributes
+
+<ResponseField name="resumable" type="bool">
+  Whether the session might be resumable
+</ResponseField>
+
+**Example:**
+
+```python
+try:
+    await gateway.resume()
+except fluxer.SessionInvalid as e:
+    if e.resumable:
+        print("Session invalid but might be resumable")
+    else:
+        print("Session invalid, need to reconnect")
+```
+
+---
+
+## Client Exceptions
+
+### LoginFailure
+
+Raised when the bot token is invalid.
+
+```python
+class LoginFailure(FluxerException):
+    """Raised when the bot token is invalid."""
+```
+
+**Example:**
+
+```python
+try:
+    bot.run("invalid_token")
+except fluxer.LoginFailure:
+    print("Failed to login: invalid token")
+```
+
+---
+
+## Error Handling Examples
+
+### Catch All Fluxer Errors
+
+```python
+import fluxer
+
+try:
+    await bot.http.create_message(channel_id, content="Hello!")
+except fluxer.FluxerException as e:
+    print(f"An error occurred: {e}")
+```
+
+### Catch Specific HTTP Errors
+
+```python
+try:
+    await bot.http.ban_guild_member(guild_id, user_id)
+except fluxer.Forbidden:
+    await ctx.reply("I don't have permission to ban members!")
+except fluxer.NotFound:
+    await ctx.reply("User not found!")
+except fluxer.HTTPException as e:
+    await ctx.reply(f"An error occurred: {e.message}")
+```
+
+### Handle Rate Limits
+
+```python
+import asyncio
+import fluxer
+
+async def send_with_retry(channel_id, content, max_retries=3):
+    for attempt in range(max_retries):
+        try:
+            return await bot.http.create_message(channel_id, content=content)
+        except fluxer.RateLimited as e:
+            if attempt < max_retries - 1:
+                print(f"Rate limited, waiting {e.retry_after}s...")
+                await asyncio.sleep(e.retry_after)
+            else:
+                raise
+```
+
+### Command Error Handler
+
+```python
+@bot.command()
+async def ban(ctx, user: str):
+    try:
+        user_id = int(user.strip('<@!>'))
+        await bot.http.ban_guild_member(ctx.guild_id, user_id)
+        await ctx.reply(f"Banned <@{user_id}>")
+    except fluxer.Forbidden:
+        await ctx.reply("I don't have permission to ban members!")
+    except fluxer.NotFound:
+        await ctx.reply("User not found!")
+    except fluxer.BadRequest as e:
+        await ctx.reply(f"Invalid request: {e.message}")
+    except fluxer.HTTPException as e:
+        await ctx.reply(f"An error occurred: {e.message}")
+    except ValueError:
+        await ctx.reply("Invalid user format! Use @mention or user ID.")
+```
+
+### Global Error Handler
+
+```python
+@bot.event
+async def on_error(error):
+    if isinstance(error, fluxer.Forbidden):
+        print("Missing permissions")
+    elif isinstance(error, fluxer.NotFound):
+        print("Resource not found")
+    elif isinstance(error, fluxer.HTTPException):
+        print(f"HTTP error {error.status}: {error.message}")
+    elif isinstance(error, fluxer.GatewayException):
+        print(f"Gateway error: {error}")
+    else:
+        print(f"Unexpected error: {error}")
+```
+
+---
+
+## Factory Function
+
+### http_exception_from_status()
+
+Factory function to create the appropriate HTTPException subclass from a status code.
+
+```python
+def http_exception_from_status(
+    status: int,
+    code: str,
+    message: str,
+    **kwargs: Any
+) -> HTTPException
+```
+
+<ParamField path="status" type="int" required>
+  HTTP status code
+</ParamField>
+
+<ParamField path="code" type="str" required>
+  API error code
+</ParamField>
+
+<ParamField path="message" type="str" required>
+  Error message
+</ParamField>
+
+<ParamField path="kwargs" type="Any">
+  Additional keyword arguments (e.g., `retry_after` for rate limits, `errors` for validation errors)
+</ParamField>
+
+<ResponseField name="return" type="HTTPException">
+  An instance of the appropriate HTTPException subclass
+</ResponseField>
+
+**Example:**
+
+```python
+from fluxer.errors import http_exception_from_status
+
+# This is used internally by the HTTP client
+exception = http_exception_from_status(
+    status=403,
+    code="MISSING_PERMISSIONS",
+    message="Missing permission to perform this action"
+)
+print(type(exception))  # <class 'fluxer.errors.Forbidden'>
+```
+
+---
+
+## Best Practices
+
+1. **Catch specific exceptions first**: More specific exceptions should be caught before general ones
+
+   ```python
+   try:
+       # ...
+   except fluxer.NotFound:
+       # Handle not found
+   except fluxer.HTTPException:
+       # Handle other HTTP errors
+   except fluxer.FluxerException:
+       # Handle any fluxer error
+   ```
+
+2. **Handle rate limits gracefully**: Always respect the `retry_after` value
+
+3. **Provide user feedback**: In commands, inform users when errors occur
+
+4. **Log errors**: Log unexpected errors for debugging
+
+5. **Don't catch everything**: Only catch exceptions you can handle meaningfully
+
+---
+
+## Source Reference
+
+Defined in `fluxer/errors.py:6-112`

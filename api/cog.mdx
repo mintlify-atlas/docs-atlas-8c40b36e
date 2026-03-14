@@ -1,0 +1,312 @@
+---
+title: Cog
+description: Organize commands and event listeners into modular classes
+---
+
+## Overview
+
+Cogs are a way to organize your bot's commands and event listeners into separate classes. This is useful for keeping large bots organized and maintainable by grouping related functionality together.
+
+Similar to discord.py's cog system, Fluxer cogs allow you to:
+- Group related commands together
+- Share state between commands via instance variables
+- Run setup/cleanup code when cogs are loaded/unloaded
+- Organize your bot into logical modules
+
+## Cog Class
+
+```python
+class Cog:
+    """Base class for creating cogs."""
+```
+
+### Constructor
+
+```python
+def __init__(self, bot: Bot) -> None
+```
+
+<ParamField path="bot" type="Bot" required>
+  The bot instance this cog is attached to
+</ParamField>
+
+### Attributes
+
+<ResponseField name="bot" type="Bot">
+  Reference to the bot instance
+</ResponseField>
+
+<ResponseField name="_commands" type="dict[str, EventHandler]">
+  Internal dictionary of registered commands (managed automatically)
+</ResponseField>
+
+<ResponseField name="_listeners" type="dict[str, list[EventHandler]]">
+  Internal dictionary of registered event listeners (managed automatically)
+</ResponseField>
+
+## Decorators
+
+### `@Cog.command()`
+
+Mark a method as a command.
+
+```python
+@staticmethod
+def command(name: str | None = None) -> Callable
+```
+
+<ParamField path="name" type="str | None">
+  Optional command name. If not provided, uses the method name.
+</ParamField>
+
+**Example:**
+
+```python
+class MyCog(Cog):
+    @Cog.command()
+    async def ping(self, ctx):
+        await ctx.reply("Pong!")
+    
+    @Cog.command(name="hi")
+    async def hello(self, ctx):
+        await ctx.reply("Hello!")
+```
+
+---
+
+### `@Cog.listener()`
+
+Mark a method as an event listener.
+
+```python
+@staticmethod
+def listener(name: str | None = None) -> Callable
+```
+
+<ParamField path="name" type="str | None">
+  Optional event name. If not provided, uses the method name.
+</ParamField>
+
+**Example:**
+
+```python
+class MyCog(Cog):
+    @Cog.listener()
+    async def on_message(self, message):
+        print(f"Message: {message.content}")
+    
+    @Cog.listener(name="on_ready")
+    async def bot_ready(self):
+        print("Bot is ready!")
+```
+
+## Lifecycle Methods
+
+### `cog_load()`
+
+Called when the cog is loaded/added to the bot. Override this to run setup code.
+
+```python
+async def cog_load(self) -> None
+```
+
+**Example:**
+
+```python
+class MyCog(Cog):
+    async def cog_load(self):
+        print(f"{self.__class__.__name__} loaded!")
+        # Initialize resources, connect to database, etc.
+        self.db = await connect_to_database()
+```
+
+---
+
+### `cog_unload()`
+
+Called when the cog is unloaded/removed from the bot. Override this to run cleanup code.
+
+```python
+async def cog_unload(self) -> None
+```
+
+**Example:**
+
+```python
+class MyCog(Cog):
+    async def cog_unload(self):
+        print(f"{self.__class__.__name__} unloaded!")
+        # Clean up resources, close connections, etc.
+        await self.db.close()
+```
+
+## Complete Example
+
+```python
+import fluxer
+from fluxer.cog import Cog
+from fluxer import Permissions
+import fluxer.checks
+
+class ModerationCog(Cog):
+    """Moderation commands and logging."""
+    
+    def __init__(self, bot):
+        super().__init__(bot)
+        self.warning_count = {}
+    
+    async def cog_load(self):
+        print("Moderation cog loaded")
+        # Load warning counts from database
+        self.warning_count = await self.bot.db.get_warnings()
+    
+    async def cog_unload(self):
+        print("Moderation cog unloaded")
+        # Save warning counts to database
+        await self.bot.db.save_warnings(self.warning_count)
+    
+    @Cog.command()
+    @fluxer.checks.has_permission(Permissions.KICK_MEMBERS)
+    async def warn(self, ctx, user: str):
+        """Warn a user."""
+        user_id = int(user.strip('<@!>'))
+        self.warning_count[user_id] = self.warning_count.get(user_id, 0) + 1
+        await ctx.reply(f"Warned <@{user_id}>. Total warnings: {self.warning_count[user_id]}")
+    
+    @Cog.command()
+    @fluxer.checks.has_permission(Permissions.BAN_MEMBERS)
+    async def ban(self, ctx, user: str, *, reason: str = "No reason provided"):
+        """Ban a user from the guild."""
+        user_id = int(user.strip('<@!>'))
+        await self.bot.http.ban_guild_member(
+            ctx.guild_id,
+            user_id,
+            reason=reason
+        )
+        await ctx.reply(f"Banned <@{user_id}>. Reason: {reason}")
+    
+    @Cog.listener()
+    async def on_message(self, message):
+        """Log all messages for moderation."""
+        if message.guild_id:
+            print(f"[{message.guild_id}] {message.author}: {message.content}")
+    
+    @Cog.listener(name="on_member_join")
+    async def welcome_member(self, member):
+        """Send a welcome message when members join."""
+        channel_id = self.bot.welcome_channels.get(member.guild_id)
+        if channel_id:
+            await self.bot.http.create_message(
+                channel_id,
+                content=f"Welcome to the server, <@{member.id}>!"
+            )
+
+# In your main bot file:
+bot = fluxer.Bot(intents=fluxer.Intents.default())
+
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user.username}")
+    # Add the cog
+    mod_cog = ModerationCog(bot)
+    await mod_cog.cog_load()
+    # Register commands and listeners with the bot
+    for name, cmd in mod_cog._commands.items():
+        bot._commands[name] = cmd
+    for event_name, listeners in mod_cog._listeners.items():
+        bot.add_listener(event_name, *listeners)
+
+bot.run("YOUR_TOKEN")
+```
+
+## Usage Patterns
+
+### Simple Cog
+
+```python
+from fluxer.cog import Cog
+
+class FunCog(Cog):
+    @Cog.command()
+    async def joke(self, ctx):
+        await ctx.reply("Why did the chicken cross the road?")
+    
+    @Cog.command()
+    async def roll(self, ctx):
+        import random
+        await ctx.reply(f"You rolled: {random.randint(1, 6)}")
+```
+
+### Cog with State
+
+```python
+from fluxer.cog import Cog
+
+class CounterCog(Cog):
+    def __init__(self, bot):
+        super().__init__(bot)
+        self.count = 0
+    
+    @Cog.command()
+    async def increment(self, ctx):
+        self.count += 1
+        await ctx.reply(f"Count: {self.count}")
+    
+    @Cog.listener()
+    async def on_message(self, message):
+        self.count += 1
+```
+
+### Cog with Database
+
+```python
+from fluxer.cog import Cog
+import aiosqlite
+
+class DatabaseCog(Cog):
+    def __init__(self, bot):
+        super().__init__(bot)
+        self.db = None
+    
+    async def cog_load(self):
+        self.db = await aiosqlite.connect('bot.db')
+        await self.db.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                id INTEGER PRIMARY KEY,
+                points INTEGER DEFAULT 0
+            )
+        ''')
+        await self.db.commit()
+    
+    async def cog_unload(self):
+        if self.db:
+            await self.db.close()
+    
+    @Cog.command()
+    async def points(self, ctx):
+        cursor = await self.db.execute(
+            'SELECT points FROM users WHERE id = ?',
+            (ctx.author.id,)
+        )
+        row = await cursor.fetchone()
+        points = row[0] if row else 0
+        await ctx.reply(f"You have {points} points")
+```
+
+## Best Practices
+
+1. **Use descriptive cog names**: Name your cog classes clearly (e.g., `ModerationCog`, `MusicCog`, `UtilityCog`)
+
+2. **Initialize in `__init__`**: Set up instance variables in the constructor
+
+3. **Use lifecycle methods**: Put setup code in `cog_load()` and cleanup in `cog_unload()`
+
+4. **Keep cogs focused**: Each cog should handle one area of functionality
+
+5. **Document commands**: Add docstrings to command methods
+
+6. **Handle errors**: Commands should handle their own errors gracefully
+
+## Source Reference
+
+Defined in `fluxer/cog.py:17-138`

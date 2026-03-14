@@ -1,0 +1,342 @@
+---
+title: 'Message'
+description: 'Represents a message in a Fluxer channel'
+---
+
+## Overview
+
+The `Message` class represents a message sent in a Fluxer channel. It provides methods for sending, editing, deleting, and reacting to messages.
+
+## Attributes
+
+<ResponseField name="id" type="int" required>
+  The message's unique ID (snowflake).
+</ResponseField>
+
+<ResponseField name="channel_id" type="int" required>
+  The ID of the channel this message was sent in.
+</ResponseField>
+
+<ResponseField name="content" type="str" required>
+  The text content of the message.
+</ResponseField>
+
+<ResponseField name="author" type="User" required>
+  The user who sent this message.
+</ResponseField>
+
+<ResponseField name="timestamp" type="str" required>
+  ISO 8601 timestamp when the message was created.
+</ResponseField>
+
+<ResponseField name="edited_timestamp" type="str | None">
+  ISO 8601 timestamp when the message was last edited, or None if never edited.
+</ResponseField>
+
+<ResponseField name="guild_id" type="int | None">
+  The ID of the guild this message was sent in, or None for DMs.
+</ResponseField>
+
+<ResponseField name="embeds" type="list[dict[str, Any]]">
+  List of embed objects attached to this message.
+</ResponseField>
+
+<ResponseField name="attachments" type="list[Attachment]">
+  List of file attachments on this message.
+</ResponseField>
+
+<ResponseField name="mentions" type="list[User]">
+  List of users mentioned in this message.
+</ResponseField>
+
+<ResponseField name="pinned" type="bool">
+  Whether this message is pinned.
+</ResponseField>
+
+<ResponseField name="reactions" type="list[Reaction]">
+  List of reactions added to this message.
+</ResponseField>
+
+<ResponseField name="referenced_message" type="Message | None">
+  The message being replied to, or None if this is not a reply.
+</ResponseField>
+
+## Properties
+
+<ResponseField name="created_at" type="datetime">
+  When this message was created (derived from snowflake ID).
+</ResponseField>
+
+<ResponseField name="channel" type="Channel | None">
+  The channel this message was sent in (if cached).
+</ResponseField>
+
+<ResponseField name="guild" type="Guild | None">
+  The guild this message was sent in (if cached).
+</ResponseField>
+
+## Methods
+
+### from_data
+
+```python
+@classmethod
+def from_data(cls, data: dict[str, Any], http: HTTPClient | None = None) -> Message
+```
+
+Construct a Message from raw API data.
+
+<ParamField path="data" type="dict[str, Any]" required>
+  Raw message object from the API.
+</ParamField>
+
+<ParamField path="http" type="HTTPClient | None">
+  HTTPClient for making further requests.
+</ParamField>
+
+### send
+
+```python
+async def send(
+    self,
+    content: str | None = None,
+    *,
+    embed: Any | None = None,
+    embeds: list[Any] | None = None,
+    file: File | None = None,
+    files: list[File] | None = None,
+    **kwargs: Any,
+) -> Message
+```
+
+Send a message to the same channel (without replying).
+
+<ParamField path="content" type="str | None">
+  The message content.
+</ParamField>
+
+<ParamField path="embed" type="Any | None">
+  A single embed to include.
+</ParamField>
+
+<ParamField path="embeds" type="list[Any] | None">
+  Multiple embeds to include.
+</ParamField>
+
+<ParamField path="file" type="File | None">
+  A single File object to attach.
+</ParamField>
+
+<ParamField path="files" type="list[File] | None">
+  Multiple File objects to attach.
+</ParamField>
+
+**Example:**
+
+```python
+# Send a message in the same channel
+new_message = await message.send("Hello!")
+```
+
+### reply
+
+```python
+async def reply(
+    self,
+    content: str | None = None,
+    *,
+    embed: Any | None = None,
+    embeds: list[Any] | None = None,
+    file: File | None = None,
+    files: list[File] | None = None,
+    **kwargs: Any,
+) -> Message
+```
+
+Reply to this message with a message reference.
+
+<ParamField path="content" type="str | None">
+  The message content.
+</ParamField>
+
+<ParamField path="embed" type="Any | None">
+  A single embed to include.
+</ParamField>
+
+<ParamField path="embeds" type="list[Any] | None">
+  Multiple embeds to include.
+</ParamField>
+
+<ParamField path="file" type="File | None">
+  A single File object to attach.
+</ParamField>
+
+<ParamField path="files" type="list[File] | None">
+  Multiple File objects to attach.
+</ParamField>
+
+**Example:**
+
+```python
+# Reply to a message
+await message.reply("Thanks for your message!")
+```
+
+### send_to_channel
+
+```python
+async def send_to_channel(
+    self,
+    channel_id: int | str,
+    content: str | None = None,
+    *,
+    embed: Any | None = None,
+    embeds: list[Any] | None = None,
+    file: File | None = None,
+    files: list[File] | None = None,
+    **kwargs: Any,
+) -> Message
+```
+
+Send a message to a different channel. This is a convenience method to send to another channel from the context of this message.
+
+<ParamField path="channel_id" type="int | str" required>
+  The target channel ID.
+</ParamField>
+
+<ParamField path="content" type="str | None">
+  The message content.
+</ParamField>
+
+<ParamField path="embed" type="Any | None">
+  A single embed to include.
+</ParamField>
+
+<ParamField path="embeds" type="list[Any] | None">
+  Multiple embeds to include.
+</ParamField>
+
+<ParamField path="file" type="File | None">
+  A single File object to attach.
+</ParamField>
+
+<ParamField path="files" type="list[File] | None">
+  Multiple File objects to attach.
+</ParamField>
+
+### edit
+
+```python
+async def edit(self, content: str | None = None, **kwargs: Any) -> Message
+```
+
+Edit this message.
+
+<ParamField path="content" type="str | None">
+  The new message content.
+</ParamField>
+
+**Example:**
+
+```python
+# Edit a message
+edited = await message.edit("Updated content!")
+```
+
+### delete
+
+```python
+async def delete(self) -> None
+```
+
+Delete this message.
+
+**Example:**
+
+```python
+# Delete a message
+await message.delete()
+```
+
+### add_reaction
+
+```python
+async def add_reaction(self, emoji: str | PartialEmoji) -> None
+```
+
+Add a reaction to this message.
+
+<ParamField path="emoji" type="str | PartialEmoji" required>
+  The emoji to react with (unicode string or PartialEmoji).
+</ParamField>
+
+**Example:**
+
+```python
+# Add a reaction
+await message.add_reaction("👍")
+```
+
+### remove_reaction
+
+```python
+async def remove_reaction(
+    self,
+    emoji: str | PartialEmoji,
+    user: User | int | str = "@me"
+) -> None
+```
+
+Remove a reaction from this message.
+
+<ParamField path="emoji" type="str | PartialEmoji" required>
+  The emoji to remove (unicode string or PartialEmoji).
+</ParamField>
+
+<ParamField path="user" type="User | int | str">
+  The user or user ID to remove the reaction from (default: @me).
+</ParamField>
+
+**Example:**
+
+```python
+# Remove your own reaction
+await message.remove_reaction("👍")
+
+# Remove another user's reaction
+await message.remove_reaction("👍", user_id)
+```
+
+### clear_reactions
+
+```python
+async def clear_reactions(self) -> None
+```
+
+Remove all reactions from this message.
+
+**Example:**
+
+```python
+# Clear all reactions
+await message.clear_reactions()
+```
+
+### clear_reaction
+
+```python
+async def clear_reaction(self, emoji: str | PartialEmoji) -> None
+```
+
+Remove all reactions of a specific emoji from this message.
+
+<ParamField path="emoji" type="str | PartialEmoji" required>
+  The emoji to clear all reactions for (unicode string or PartialEmoji).
+</ParamField>
+
+**Example:**
+
+```python
+# Clear all 👍 reactions
+await message.clear_reaction("👍")
+```

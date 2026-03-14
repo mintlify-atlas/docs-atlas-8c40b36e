@@ -1,0 +1,104 @@
+---
+title: 'VoiceState'
+description: "Represents a user's voice state in a guild"
+---
+
+## Overview
+
+The `VoiceState` class represents a user's voice state in a guild, including which voice channel they're in and their mute/deaf status.
+
+## Attributes
+
+<ResponseField name="user_id" type="int" required>
+  The ID of the user this voice state belongs to.
+</ResponseField>
+
+<ResponseField name="guild_id" type="int | None">
+  The ID of the guild this voice state is for.
+</ResponseField>
+
+<ResponseField name="channel_id" type="int | None">
+  The ID of the voice channel the user is connected to, or None if not connected.
+</ResponseField>
+
+<ResponseField name="session_id" type="str | None">
+  The session ID for this voice state.
+</ResponseField>
+
+<ResponseField name="mute" type="bool">
+  Whether the user is server-muted.
+</ResponseField>
+
+<ResponseField name="deaf" type="bool">
+  Whether the user is server-deafened.
+</ResponseField>
+
+<ResponseField name="self_mute" type="bool">
+  Whether the user has muted themselves.
+</ResponseField>
+
+<ResponseField name="self_deaf" type="bool">
+  Whether the user has deafened themselves.
+</ResponseField>
+
+<ResponseField name="self_stream" type="bool">
+  Whether the user is streaming.
+</ResponseField>
+
+<ResponseField name="self_video" type="bool">
+  Whether the user's camera is enabled.
+</ResponseField>
+
+<ResponseField name="suppress" type="bool">
+  Whether the user is suppressed (muted by the server in stage channels).
+</ResponseField>
+
+<ResponseField name="request_to_speak_timestamp" type="str | None">
+  ISO 8601 timestamp of when the user requested to speak (in stage channels).
+</ResponseField>
+
+<ResponseField name="member" type="GuildMember | None">
+  The guild member this voice state belongs to.
+</ResponseField>
+
+## Methods
+
+### from_data
+
+```python
+@classmethod
+def from_data(
+    cls,
+    data: dict[str, Any],
+    http: HTTPClient | None = None
+) -> VoiceState
+```
+
+Construct a VoiceState from raw API data.
+
+<ParamField path="data" type="dict[str, Any]" required>
+  Raw voice state object from the API.
+</ParamField>
+
+<ParamField path="http" type="HTTPClient | None">
+  HTTPClient for making further requests.
+</ParamField>
+
+## Usage Example
+
+```python
+# Voice states are typically received from gateway events
+@client.event
+async def on_voice_state_update(member, before, after):
+    if before.channel_id != after.channel_id:
+        if after.channel_id:
+            print(f"{member} joined voice channel {after.channel_id}")
+        else:
+            print(f"{member} left voice channel {before.channel_id}")
+    
+    if before.self_mute != after.self_mute:
+        if after.self_mute:
+            print(f"{member} muted themselves")
+        else:
+            print(f"{member} unmuted themselves")
+```

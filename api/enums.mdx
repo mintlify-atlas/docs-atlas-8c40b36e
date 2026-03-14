@@ -1,0 +1,236 @@
+---
+title: Other Enums
+description: Channel types, gateway opcodes, and close codes
+---
+
+## ChannelType
+
+Enum representing the different types of channels in Fluxer.
+
+### Values
+
+<ParamField path="GUILD_TEXT" type="int" default="0">
+  A text channel in a guild
+</ParamField>
+
+<ParamField path="DM" type="int" default="1">
+  A direct message channel between two users
+</ParamField>
+
+<ParamField path="GUILD_VOICE" type="int" default="2">
+  A voice channel in a guild
+</ParamField>
+
+<ParamField path="GROUP_DM" type="int" default="3">
+  A direct message channel between multiple users
+</ParamField>
+
+<ParamField path="GUILD_CATEGORY" type="int" default="4">
+  An organizational category that contains channels
+</ParamField>
+
+<ParamField path="GUILD_ANNOUNCEMENT" type="int" default="5">
+  A channel that can be followed by other guilds (formerly "news" channels)
+</ParamField>
+
+### Usage
+
+```python
+from fluxer.enums import ChannelType
+
+@bot.event
+async def on_message(message):
+    if message.channel.type == ChannelType.GUILD_TEXT:
+        print("Message in guild text channel")
+    elif message.channel.type == ChannelType.DM:
+        print("Direct message")
+```
+
+### Source Reference
+
+Defined in `fluxer/enums.py:128-135`
+
+---
+
+## GatewayOpcode
+
+Gateway opcodes define the type of payload being sent or received over the WebSocket connection. Fluxer mirrors Discord's opcode structure for wire compatibility.
+
+### Values
+
+<ParamField path="DISPATCH" type="int" default="0">
+  **Server → Client**: An event was dispatched (MESSAGE_CREATE, GUILD_CREATE, etc.)
+</ParamField>
+
+<ParamField path="HEARTBEAT" type="int" default="1">
+  **Bidirectional**: Maintain connection / request heartbeat
+</ParamField>
+
+<ParamField path="IDENTIFY" type="int" default="2">
+  **Client → Server**: Start a new session with authentication
+</ParamField>
+
+<ParamField path="PRESENCE_UPDATE" type="int" default="3">
+  **Client → Server**: Update client presence/status
+</ParamField>
+
+<ParamField path="VOICE_STATE_UPDATE" type="int" default="4">
+  **Client → Server**: Join, move, or leave voice channels
+</ParamField>
+
+<ParamField path="RESUME" type="int" default="6">
+  **Client → Server**: Resume a dropped connection
+</ParamField>
+
+<ParamField path="RECONNECT" type="int" default="7">
+  **Server → Client**: Client should reconnect
+</ParamField>
+
+<ParamField path="REQUEST_GUILD_MEMBERS" type="int" default="8">
+  **Client → Server**: Request guild member list
+</ParamField>
+
+<ParamField path="INVALID_SESSION" type="int" default="9">
+  **Server → Client**: Session is invalid
+</ParamField>
+
+<ParamField path="HELLO" type="int" default="10">
+  **Server → Client**: Sent on connect, contains heartbeat_interval
+</ParamField>
+
+<ParamField path="HEARTBEAT_ACK" type="int" default="11">
+  **Server → Client**: Acknowledgement of heartbeat
+</ParamField>
+
+### Usage
+
+```python
+from fluxer.enums import GatewayOpcode
+
+# These are typically handled internally by the library
+# You rarely need to interact with opcodes directly
+
+@bot.event
+async def on_raw_gateway_event(opcode, data):
+    if opcode == GatewayOpcode.DISPATCH:
+        print(f"Event received: {data['t']}")
+    elif opcode == GatewayOpcode.HEARTBEAT_ACK:
+        print("Heartbeat acknowledged")
+```
+
+### Source Reference
+
+Defined in `fluxer/enums.py:11-24`
+
+---
+
+## GatewayCloseCode
+
+WebSocket close codes that the Fluxer gateway may send when disconnecting. These help determine whether reconnection should be attempted.
+
+### Values
+
+<ParamField path="UNKNOWN_ERROR" type="int" default="4000">
+  An unknown error occurred
+</ParamField>
+
+<ParamField path="UNKNOWN_OPCODE" type="int" default="4001">
+  An invalid opcode was sent
+</ParamField>
+
+<ParamField path="DECODE_ERROR" type="int" default="4002">
+  An invalid payload was sent
+</ParamField>
+
+<ParamField path="NOT_AUTHENTICATED" type="int" default="4003">
+  A payload was sent before identifying
+</ParamField>
+
+<ParamField path="AUTHENTICATION_FAILED" type="int" default="4004">
+  The token provided is invalid (not reconnectable)
+</ParamField>
+
+<ParamField path="ALREADY_AUTHENTICATED" type="int" default="4005">
+  Multiple identify payloads were sent
+</ParamField>
+
+<ParamField path="INVALID_SEQ" type="int" default="4007">
+  The sequence number sent was invalid
+</ParamField>
+
+<ParamField path="RATE_LIMITED" type="int" default="4008">
+  Too many payloads were sent too quickly
+</ParamField>
+
+<ParamField path="SESSION_TIMED_OUT" type="int" default="4009">
+  The session timed out
+</ParamField>
+
+<ParamField path="INVALID_SHARD" type="int" default="4010">
+  Invalid shard information was provided (not reconnectable)
+</ParamField>
+
+<ParamField path="SHARDING_REQUIRED" type="int" default="4011">
+  The bot is in too many guilds and requires sharding (not reconnectable)
+</ParamField>
+
+<ParamField path="INVALID_API_VERSION" type="int" default="4012">
+  An invalid API version was provided (not reconnectable)
+</ParamField>
+
+<ParamField path="INVALID_INTENTS" type="int" default="4013">
+  Invalid intent flags were provided (not reconnectable)
+</ParamField>
+
+<ParamField path="DISALLOWED_INTENTS" type="int" default="4014">
+  Privileged intents were requested without being enabled (not reconnectable)
+</ParamField>
+
+### Properties
+
+#### `is_reconnectable`
+
+Whether the bot should attempt to reconnect after receiving this close code.
+
+```python
+from fluxer.enums import GatewayCloseCode
+
+close_code = GatewayCloseCode.AUTHENTICATION_FAILED
+if close_code.is_reconnectable:
+    print("Should reconnect")
+else:
+    print("Fatal error, cannot reconnect")
+```
+
+<ResponseField name="return" type="bool">
+  `True` if reconnection should be attempted, `False` otherwise
+</ResponseField>
+
+**Non-reconnectable codes:**
+- `AUTHENTICATION_FAILED` (4004) - Invalid token
+- `INVALID_SHARD` (4010) - Bad shard info
+- `SHARDING_REQUIRED` (4011) - Bot needs sharding
+- `INVALID_API_VERSION` (4012) - Wrong API version
+- `INVALID_INTENTS` (4013) - Invalid intent flags
+- `DISALLOWED_INTENTS` (4014) - Privileged intents not enabled
+
+### Usage
+
+```python
+from fluxer.enums import GatewayCloseCode
+
+@bot.event
+async def on_disconnect(close_code):
+    code = GatewayCloseCode(close_code)
+    print(f"Disconnected with code: {code.name}")
+    
+    if not code.is_reconnectable:
+        print("Fatal error - cannot reconnect")
+        # Handle fatal errors (e.g., notify admin, exit gracefully)
+    else:
+        print("Will attempt to reconnect")
+```
+
+### Source Reference
+
+Defined in `fluxer/enums.py:91-121`

@@ -1,0 +1,481 @@
+---
+title: "Client"
+description: "Low-level client that connects to Fluxer and dispatches events"
+---
+
+## Overview
+
+The `Client` class is the low-level client that connects to Fluxer and dispatches events. This gives you full control over the gateway lifecycle. For most bots, use the `Bot` subclass instead.
+
+## Constructor
+
+```python
+from fluxer import Client, Intents
+
+client = Client(
+    intents=Intents.default(),
+    api_url=None,
+    max_retries=5,
+    retry_forever=False
+)
+```
+
+### Parameters
+
+<ParamField path="intents" type="Intents" default="Intents.default()">
+  Gateway intents to request. Controls which events your bot receives.
+</ParamField>
+
+<ParamField path="api_url" type="str | None" default="None">
+  Base URL for the Fluxer API (default: https://api.fluxer.app/v1). Use this to connect to self-hosted Fluxer instances.
+</ParamField>
+
+<ParamField path="max_retries" type="int" default="5">
+  Maximum number of retries for HTTP requests.
+</ParamField>
+
+<ParamField path="retry_forever" type="bool" default="False">
+  Whether to retry HTTP requests indefinitely.
+</ParamField>
+
+## Properties
+
+### user
+
+```python
+client.user -> User | None
+```
+
+The bot user, available after the READY event.
+
+### guilds
+
+```python
+client.guilds -> list[Guild]
+```
+
+List of guilds the bot is in (populated from READY + GUILD_CREATE events).
+
+## Event Registration
+
+### event()
+
+```python
+@client.event
+async def on_message(message):
+    ...
+```
+
+Decorator to register an event handler. The function name determines the event.
+
+**Supported events:**
+- `on_ready` → READY
+- `on_message` → MESSAGE_CREATE
+- `on_message_edit` → MESSAGE_UPDATE
+- `on_message_delete` → MESSAGE_DELETE
+- `on_guild_join` → GUILD_CREATE
+- `on_guild_remove` → GUILD_DELETE
+- `on_member_join` → GUILD_MEMBER_ADD
+- `on_member_remove` → GUILD_MEMBER_REMOVE
+- `on_channel_create` → CHANNEL_CREATE
+- `on_channel_update` → CHANNEL_UPDATE
+- `on_channel_delete` → CHANNEL_DELETE
+- `on_voice_state_update` → VOICE_STATE_UPDATE
+- `on_resumed` → RESUMED
+- `on_raw_reaction_add` → MESSAGE_REACTION_ADD (raw)
+- `on_raw_reaction_remove` → MESSAGE_REACTION_REMOVE (raw)
+- `on_raw_reaction_clear` → MESSAGE_REACTION_REMOVE_ALL (raw)
+- `on_raw_reaction_clear_emoji` → MESSAGE_REACTION_REMOVE_EMOJI (raw)
+
+### on()
+
+```python
+@client.on("message")
+async def handle_msg(message):
+    ...
+```
+
+Decorator to register an event handler with an explicit name.
+
+<ParamField path="event_name" type="str" required>
+  The event name (without "on_" prefix)
+</ParamField>
+
+## HTTP Methods
+
+### fetch_channel()
+
+```python
+await client.fetch_channel(channel_id)
+```
+
+Fetch a channel from the API (not cache).
+
+<ParamField path="channel_id" type="str" required>
+  The channel ID to fetch
+</ParamField>
+
+<ResponseField name="return" type="Channel">
+  The channel object
+</ResponseField>
+
+### fetch_message()
+
+```python
+await client.fetch_message(channel_id, message_id)
+```
+
+Fetch a message from the API by channel ID and message ID.
+
+<ParamField path="channel_id" type="str" required>
+  The channel ID
+</ParamField>
+
+<ParamField path="message_id" type="str" required>
+  The message ID
+</ParamField>
+
+<ResponseField name="return" type="Message">
+  The message object
+</ResponseField>
+
+### delete_message()
+
+```python
+await client.delete_message(channel_id, message_id)
+```
+
+Delete a message by channel ID and message ID without fetching it first.
+
+<ParamField path="channel_id" type="int | str" required>
+  The channel ID where the message is located
+</ParamField>
+
+<ParamField path="message_id" type="int | str" required>
+  The message ID to delete
+</ParamField>
+
+### fetch_guild()
+
+```python
+await client.fetch_guild(guild_id)
+```
+
+Fetch a guild from the API.
+
+<ParamField path="guild_id" type="str" required>
+  The guild ID to fetch
+</ParamField>
+
+<ResponseField name="return" type="Guild">
+  The guild object
+</ResponseField>
+
+### fetch_user()
+
+```python
+await client.fetch_user(user_id)
+```
+
+Fetch a user from the API.
+
+<ParamField path="user_id" type="str" required>
+  The user ID to fetch
+</ParamField>
+
+<ResponseField name="return" type="User">
+  The user object
+</ResponseField>
+
+### fetch_user_profile()
+
+```python
+await client.fetch_user_profile(user_id, guild_id=None)
+```
+
+Fetch a user's full profile from the API. This returns additional profile information like bio, pronouns, banner, etc. that is not included in the basic user object.
+
+<ParamField path="user_id" type="str" required>
+  The user ID to fetch
+</ParamField>
+
+<ParamField path="guild_id" type="str | None">
+  Optional guild ID for guild-specific profile data
+</ParamField>
+
+<ResponseField name="return" type="UserProfile">
+  UserProfile containing the user and their profile information
+</ResponseField>
+
+### fetch_webhook()
+
+```python
+await client.fetch_webhook(webhook_id)
+```
+
+Fetch a webhook from the API.
+
+<ParamField path="webhook_id" type="str" required>
+  The webhook ID to fetch
+</ParamField>
+
+<ResponseField name="return" type="Webhook">
+  The webhook object
+</ResponseField>
+
+### fetch_channel_webhooks()
+
+```python
+await client.fetch_channel_webhooks(channel_id)
+```
+
+Fetch all webhooks for a channel.
+
+<ParamField path="channel_id" type="str" required>
+  The channel ID
+</ParamField>
+
+<ResponseField name="return" type="list[Webhook]">
+  List of webhook objects
+</ResponseField>
+
+### fetch_guild_webhooks()
+
+```python
+await client.fetch_guild_webhooks(guild_id)
+```
+
+Fetch all webhooks for a guild.
+
+<ParamField path="guild_id" type="str" required>
+  The guild ID
+</ParamField>
+
+<ResponseField name="return" type="list[Webhook]">
+  List of webhook objects
+</ResponseField>
+
+### create_webhook()
+
+```python
+await client.create_webhook(channel_id, name="My Webhook", avatar=None)
+```
+
+Create a webhook in a channel.
+
+<ParamField path="channel_id" type="str" required>
+  The channel ID to create the webhook in
+</ParamField>
+
+<ParamField path="name" type="str" required>
+  The webhook name
+</ParamField>
+
+<ParamField path="avatar" type="str | None">
+  The webhook avatar (base64 data URI or URL)
+</ParamField>
+
+<ResponseField name="return" type="Webhook">
+  The created webhook object
+</ResponseField>
+
+## Voice Methods
+
+### join_voice()
+
+```python
+await client.join_voice(guild_id, channel_id, self_mute=False, self_deaf=False)
+```
+
+Join a voice channel and return a connected VoiceClient. Requires `pip install fluxer.py[voice]`.
+
+<ParamField path="guild_id" type="int" required>
+  The guild ID
+</ParamField>
+
+<ParamField path="channel_id" type="int" required>
+  The voice channel ID to join
+</ParamField>
+
+<ParamField path="self_mute" type="bool" default="False">
+  Whether to mute yourself
+</ParamField>
+
+<ParamField path="self_deaf" type="bool" default="False">
+  Whether to deafen yourself
+</ParamField>
+
+<ResponseField name="return" type="VoiceClient">
+  The connected voice client
+</ResponseField>
+
+### get_voice_state()
+
+```python
+client.get_voice_state(guild_id, user_id)
+```
+
+Return the cached voice state for a user in a guild, or None.
+
+<ParamField path="guild_id" type="int" required>
+  The guild ID
+</ParamField>
+
+<ParamField path="user_id" type="int" required>
+  The user ID
+</ParamField>
+
+<ResponseField name="return" type="VoiceState | None">
+  The voice state or None if not found
+</ResponseField>
+
+### get_guild_voice_states()
+
+```python
+client.get_guild_voice_states(guild_id)
+```
+
+Return all cached voice states for a guild.
+
+<ParamField path="guild_id" type="int" required>
+  The guild ID
+</ParamField>
+
+<ResponseField name="return" type="list[VoiceState]">
+  List of voice states
+</ResponseField>
+
+## Reaction Methods
+
+### add_reaction()
+
+```python
+await client.add_reaction(channel_id, message_id, emoji)
+```
+
+Add a reaction to a message by channel_id and message_id.
+
+<ParamField path="channel_id" type="int | str" required>
+  The channel ID
+</ParamField>
+
+<ParamField path="message_id" type="int | str" required>
+  The message ID
+</ParamField>
+
+<ParamField path="emoji" type="str" required>
+  The emoji to react with (unicode string or custom emoji format)
+</ParamField>
+
+### remove_reaction()
+
+```python
+await client.remove_reaction(channel_id, message_id, emoji, user_id="@me")
+```
+
+Remove a reaction from a message by channel_id and message_id.
+
+<ParamField path="channel_id" type="int | str" required>
+  The channel ID
+</ParamField>
+
+<ParamField path="message_id" type="int | str" required>
+  The message ID
+</ParamField>
+
+<ParamField path="emoji" type="str" required>
+  The emoji to remove (unicode string or custom emoji format)
+</ParamField>
+
+<ParamField path="user_id" type="int | str" default="@me">
+  The user ID to remove the reaction from
+</ParamField>
+
+### clear_reactions()
+
+```python
+await client.clear_reactions(channel_id, message_id)
+```
+
+Remove all reactions from a message.
+
+<ParamField path="channel_id" type="int | str" required>
+  The channel ID
+</ParamField>
+
+<ParamField path="message_id" type="int | str" required>
+  The message ID
+</ParamField>
+
+### clear_reaction()
+
+```python
+await client.clear_reaction(channel_id, message_id, emoji)
+```
+
+Remove all reactions of a specific emoji from a message.
+
+<ParamField path="channel_id" type="int | str" required>
+  The channel ID
+</ParamField>
+
+<ParamField path="message_id" type="int | str" required>
+  The message ID
+</ParamField>
+
+<ParamField path="emoji" type="str" required>
+  The emoji to clear (unicode string or custom emoji format)
+</ParamField>
+
+## Connection Lifecycle
+
+### start()
+
+```python
+await client.start(token)
+```
+
+Connect to Fluxer and start receiving events (async version). Use this if you're managing your own event loop.
+
+<ParamField path="token" type="str" required>
+  Your bot token
+</ParamField>
+
+### close()
+
+```python
+await client.close()
+```
+
+Disconnect from the gateway and clean up resources.
+
+### run()
+
+```python
+client.run(token)
+```
+
+Blocking call that connects to Fluxer and runs the bot. This is the simplest way to start your bot. It creates an event loop, calls start(), and handles cleanup.
+
+<ParamField path="token" type="str" required>
+  Your bot token
+</ParamField>
+
+## Example Usage
+
+```python
+from fluxer import Client, Intents
+
+client = Client(intents=Intents.default())
+
+@client.event
+async def on_ready():
+    print(f"Logged in as {client.user.username}")
+
+@client.event
+async def on_message(message):
+    if message.content == "!ping":
+        await message.reply("Pong!")
+
+client.run("your_token_here")
+```

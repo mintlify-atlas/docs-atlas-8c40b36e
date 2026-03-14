@@ -1,0 +1,261 @@
+---
+title: Permissions
+description: Permission bitfield flags for roles and channel overwrites
+---
+
+## Overview
+
+Permissions control what actions users can perform in a guild or channel. Each permission is a bit flag that can be combined using bitwise operators.
+
+## Usage
+
+```python
+from fluxer import Permissions
+
+# Combine multiple permissions
+mod_perms = Permissions.KICK_MEMBERS | Permissions.BAN_MEMBERS | Permissions.MANAGE_MESSAGES
+
+# Check if a permission is set
+if role.permissions & Permissions.ADMINISTRATOR:
+    print("User is an admin!")
+
+# Check multiple permissions
+required = Permissions.SEND_MESSAGES | Permissions.EMBED_LINKS
+if (user_perms & required) == required:
+    print("User can send messages with embeds")
+```
+
+## Permission Flags
+
+### General Permissions
+
+<ParamField path="CREATE_INVITE" type="int" default="1 << 0">
+  Allows creating instant invites
+</ParamField>
+
+<ParamField path="KICK_MEMBERS" type="int" default="1 << 1">
+  Allows kicking members from the guild
+</ParamField>
+
+<ParamField path="BAN_MEMBERS" type="int" default="1 << 2">
+  Allows banning members from the guild
+</ParamField>
+
+<ParamField path="ADMINISTRATOR" type="int" default="1 << 3">
+  Grants all permissions and bypasses channel permission overwrites
+</ParamField>
+
+<ParamField path="MANAGE_CHANNELS" type="int" default="1 << 4">
+  Allows management and editing of channels
+</ParamField>
+
+<ParamField path="MANAGE_GUILD" type="int" default="1 << 5">
+  Allows management and editing of the guild
+</ParamField>
+
+<ParamField path="ADD_REACTIONS" type="int" default="1 << 6">
+  Allows adding reactions to messages
+</ParamField>
+
+<ParamField path="VIEW_AUDIT_LOG" type="int" default="1 << 7">
+  Allows viewing the guild's audit log
+</ParamField>
+
+<ParamField path="PRIORITY_SPEAKER" type="int" default="1 << 8">
+  Allows using priority speaker in voice channels
+</ParamField>
+
+<ParamField path="STREAM" type="int" default="1 << 9">
+  Allows streaming in voice channels
+</ParamField>
+
+<ParamField path="VIEW_CHANNEL" type="int" default="1 << 10">
+  Allows viewing channels (read messages, see voice channels)
+</ParamField>
+
+<ParamField path="SEND_MESSAGES" type="int" default="1 << 11">
+  Allows sending messages in text channels
+</ParamField>
+
+<ParamField path="SEND_TTS_MESSAGES" type="int" default="1 << 12">
+  Allows sending text-to-speech messages
+</ParamField>
+
+<ParamField path="MANAGE_MESSAGES" type="int" default="1 << 13">
+  Allows deleting and pinning messages from other users
+</ParamField>
+
+<ParamField path="EMBED_LINKS" type="int" default="1 << 14">
+  Allows links to automatically embed in messages
+</ParamField>
+
+<ParamField path="ATTACH_FILES" type="int" default="1 << 15">
+  Allows uploading files and media
+</ParamField>
+
+<ParamField path="READ_MESSAGE_HISTORY" type="int" default="1 << 16">
+  Allows reading message history in channels
+</ParamField>
+
+<ParamField path="MENTION_EVERYONE" type="int" default="1 << 17">
+  Allows using @everyone and @here mentions
+</ParamField>
+
+<ParamField path="USE_EXTERNAL_EMOJIS" type="int" default="1 << 18">
+  Allows using emojis from other servers
+</ParamField>
+
+<ParamField path="USE_EXTERNAL_STICKERS" type="int" default="1 << 33">
+  Allows using stickers from other servers
+</ParamField>
+
+<ParamField path="MODERATE_MEMBERS" type="int" default="1 << 40">
+  Allows timing out members (muting them from text and voice)
+</ParamField>
+
+<ParamField path="CREATE_EXPRESSIONS" type="int" default="1 << 43">
+  Allows creating custom emojis, stickers, and soundboard sounds
+</ParamField>
+
+<ParamField path="PIN_MESSAGES" type="int" default="1 << 51">
+  Allows pinning messages in channels
+</ParamField>
+
+<ParamField path="BYPASS_SLOWMODE" type="int" default="1 << 52">
+  Allows bypassing slowmode restrictions
+</ParamField>
+
+<ParamField path="UPDATE_RTC_REGION" type="int" default="1 << 53">
+  Allows changing the voice server region for the guild
+</ParamField>
+
+### Voice Permissions
+
+<ParamField path="CONNECT" type="int" default="1 << 20">
+  Allows connecting to voice channels
+</ParamField>
+
+<ParamField path="SPEAK" type="int" default="1 << 21">
+  Allows speaking in voice channels
+</ParamField>
+
+<ParamField path="MUTE_MEMBERS" type="int" default="1 << 22">
+  Allows muting members in voice channels
+</ParamField>
+
+<ParamField path="DEAFEN_MEMBERS" type="int" default="1 << 23">
+  Allows deafening members in voice channels
+</ParamField>
+
+<ParamField path="MOVE_MEMBERS" type="int" default="1 << 24">
+  Allows moving members between voice channels
+</ParamField>
+
+<ParamField path="USE_VOICE_ACTIVITY_DETECTION" type="int" default="1 << 25">
+  Allows using voice activity detection (no push-to-talk)
+</ParamField>
+
+### Member Management Permissions
+
+<ParamField path="CHANGE_NICKNAME" type="int" default="1 << 26">
+  Allows changing own nickname
+</ParamField>
+
+<ParamField path="MANAGE_NICKNAMES" type="int" default="1 << 27">
+  Allows changing other members' nicknames
+</ParamField>
+
+<ParamField path="MANAGE_ROLES" type="int" default="1 << 28">
+  Allows managing roles (create, edit, delete, assign)
+</ParamField>
+
+<ParamField path="MANAGE_WEBHOOKS" type="int" default="1 << 29">
+  Allows managing webhooks
+</ParamField>
+
+<ParamField path="MANAGE_EXPRESSIONS" type="int" default="1 << 30">
+  Allows managing emojis, stickers, and soundboard sounds
+</ParamField>
+
+## Examples
+
+### Check Admin Permission
+
+```python
+from fluxer import Permissions
+
+@bot.event
+async def on_message(message):
+    if message.guild_id:
+        member = await bot.get_guild_member(message.guild_id, message.author.id)
+        if member.permissions & Permissions.ADMINISTRATOR:
+            print(f"{message.author} is an administrator!")
+```
+
+### Require Multiple Permissions
+
+```python
+from fluxer import Permissions
+import fluxer.checks
+
+@bot.command()
+@fluxer.checks.has_permission(Permissions.KICK_MEMBERS | Permissions.BAN_MEMBERS)
+async def moderate(ctx):
+    await ctx.reply("You can both kick and ban members!")
+```
+
+### Create Role with Permissions
+
+```python
+from fluxer import Permissions
+
+# Moderator permissions
+mod_perms = (
+    Permissions.KICK_MEMBERS |
+    Permissions.BAN_MEMBERS |
+    Permissions.MANAGE_MESSAGES |
+    Permissions.VIEW_AUDIT_LOG
+)
+
+role = await guild.create_role(
+    name="Moderator",
+    permissions=int(mod_perms),
+    color=0x00FF00
+)
+```
+
+### Check Text Channel Permissions
+
+```python
+from fluxer import Permissions
+
+required_perms = (
+    Permissions.VIEW_CHANNEL |
+    Permissions.SEND_MESSAGES |
+    Permissions.EMBED_LINKS
+)
+
+if (user_perms & required_perms) == required_perms:
+    await channel.send("You have all required permissions!")
+else:
+    print("Missing permissions")
+```
+
+## Permission Hierarchy
+
+1. **Administrator** - Bypasses all permission checks
+2. **Guild Owner** - Has all permissions automatically
+3. **Role Permissions** - Cumulative from all roles the user has
+4. **Channel Overwrites** - Can allow or deny specific permissions in channels
+
+## Notes
+
+- Permissions are stored as a 64-bit integer
+- Use bitwise OR (`|`) to combine permissions
+- Use bitwise AND (`&`) to check if a permission is present
+- The `ADMINISTRATOR` permission grants all other permissions
+- Guild owners bypass all permission checks
+
+## Source Reference
+
+Defined in `fluxer/enums.py:142-193`

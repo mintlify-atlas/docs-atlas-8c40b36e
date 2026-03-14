@@ -1,0 +1,240 @@
+---
+title: 'Channel'
+description: 'Represents a Fluxer channel (text, DM, voice, category, etc.)'
+---
+
+## Overview
+
+The `Channel` class represents a Fluxer channel. Channels can be text channels, voice channels, DM channels, or category channels.
+
+## Attributes
+
+<ResponseField name="id" type="int" required>
+  The channel's unique ID (snowflake).
+</ResponseField>
+
+<ResponseField name="type" type="int" required>
+  The type of channel (see ChannelType enum).
+</ResponseField>
+
+<ResponseField name="name" type="str | None">
+  The channel's name. None for DM channels.
+</ResponseField>
+
+<ResponseField name="guild_id" type="int | None">
+  The ID of the guild this channel belongs to, or None for DMs.
+</ResponseField>
+
+<ResponseField name="position" type="int | None">
+  The sorting position of the channel.
+</ResponseField>
+
+<ResponseField name="topic" type="str | None">
+  The channel topic or description.
+</ResponseField>
+
+<ResponseField name="nsfw" type="bool">
+  Whether the channel is marked as NSFW.
+</ResponseField>
+
+<ResponseField name="parent_id" type="int | None">
+  The ID of the parent category channel.
+</ResponseField>
+
+## Properties
+
+<ResponseField name="guild" type="Guild | None">
+  The guild this channel belongs to (if cached).
+</ResponseField>
+
+<ResponseField name="mention" type="str">
+  A string that mentions this channel in a message (e.g., `<#123456>`).
+</ResponseField>
+
+<ResponseField name="created_at" type="datetime">
+  When this channel was created (derived from snowflake ID).
+</ResponseField>
+
+<ResponseField name="is_text_channel" type="bool">
+  Whether this is a guild text channel.
+</ResponseField>
+
+<ResponseField name="is_voice_channel" type="bool">
+  Whether this is a voice channel.
+</ResponseField>
+
+<ResponseField name="is_dm" type="bool">
+  Whether this is a DM channel.
+</ResponseField>
+
+<ResponseField name="is_category" type="bool">
+  Whether this is a category channel.
+</ResponseField>
+
+## Methods
+
+### from_data
+
+```python
+@classmethod
+def from_data(cls, data: dict[str, Any], http: HTTPClient | None = None) -> Channel
+```
+
+Construct a Channel from raw API data.
+
+<ParamField path="data" type="dict[str, Any]" required>
+  Raw channel object from the API.
+</ParamField>
+
+<ParamField path="http" type="HTTPClient | None">
+  HTTPClient for making further requests.
+</ParamField>
+
+### send
+
+```python
+async def send(
+    self,
+    content: str | None = None,
+    *,
+    embed: Embed | None = None,
+    embeds: list[Embed] | None = None,
+    file: File | None = None,
+    files: list[File] | None = None,
+    message_reference: dict[str, Any] | None = None,
+) -> Message
+```
+
+Send a message to this channel.
+
+<ParamField path="content" type="str | None">
+  Text content of the message.
+</ParamField>
+
+<ParamField path="embed" type="Embed | None">
+  A single embed to include.
+</ParamField>
+
+<ParamField path="embeds" type="list[Embed] | None">
+  Multiple embeds to include.
+</ParamField>
+
+<ParamField path="file" type="File | None">
+  A single File object to attach.
+</ParamField>
+
+<ParamField path="files" type="list[File] | None">
+  Multiple File objects to attach.
+</ParamField>
+
+<ParamField path="message_reference" type="dict[str, Any] | None">
+  Reference to another message for replies.
+</ParamField>
+
+**Examples:**
+
+```python
+# Send a text message
+await channel.send("Hello, world!")
+
+# Send a file from path
+from fluxer import File
+await channel.send("Hello!", file=File("image.png"))
+
+# Send multiple files
+await channel.send("Files:", files=[File("a.txt"), File("b.txt")])
+
+# Send file with embed
+embed = Embed(title="Title")
+await channel.send(embed=embed, file=File("data.json"))
+```
+
+### fetch_message
+
+```python
+async def fetch_message(self, message_id: int | str) -> Message
+```
+
+Fetch a message from this channel by ID.
+
+<ParamField path="message_id" type="int | str" required>
+  The message ID to fetch.
+</ParamField>
+
+**Example:**
+
+```python
+# Fetch a specific message
+message = await channel.fetch_message(123456789)
+```
+
+### fetch_messages
+
+```python
+async def fetch_messages(self, limit: int = 50) -> list[Message]
+```
+
+Fetch recent messages from this channel.
+
+<ParamField path="limit" type="int">
+  The maximum number of messages to fetch (default 50).
+</ParamField>
+
+**Example:**
+
+```python
+# Fetch last 10 messages
+messages = await channel.fetch_messages(limit=10)
+```
+
+### delete_messages
+
+```python
+async def delete_messages(self, message_ids: list[int | str]) -> None
+```
+
+Bulk delete messages in this channel.
+
+<ParamField path="message_ids" type="list[int | str]" required>
+  A list of message IDs to delete.
+</ParamField>
+
+**Example:**
+
+```python
+# Bulk delete messages
+await channel.delete_messages([123456, 789012, 345678])
+```
+
+### connect
+
+```python
+async def connect(
+    self,
+    client: Client,
+    *,
+    self_mute: bool = False,
+    self_deaf: bool = False,
+) -> VoiceClient
+```
+
+Join this voice channel and return a connected VoiceClient. Requires fluxer.py[voice].
+
+<ParamField path="client" type="Client" required>
+  The client instance to use for the voice connection.
+</ParamField>
+
+<ParamField path="self_mute" type="bool">
+  Whether to mute yourself when joining.
+</ParamField>
+
+<ParamField path="self_deaf" type="bool">
+  Whether to deafen yourself when joining.
+</ParamField>
+
+**Example:**
+
+```python
+# Join a voice channel
+voice_client = await voice_channel.connect(client)
+```

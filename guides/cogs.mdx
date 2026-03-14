@@ -1,0 +1,277 @@
+---
+title: Cogs
+description: Organize your bot's commands and listeners into modular components
+---
+
+Cogs provide a way to organize your bot's commands and event listeners into separate, reusable classes. This is especially useful for large bots where keeping all commands in a single file becomes unwieldy.
+
+## Why Use Cogs?
+
+Cogs help you:
+- **Organize code** into logical modules (moderation, music, games, etc.)
+- **Enable hot-reloading** to update features without restarting
+- **Share functionality** across projects
+- **Separate concerns** with dedicated classes for different features
+
+## Creating a Cog
+
+A cog is a class that inherits from `fluxer.Cog` and contains commands and event listeners.
+
+```python
+import fluxer
+from fluxer import Cog
+
+class MyCog(Cog):
+    def __init__(self, bot):
+        super().__init__(bot)
+        # You can initialize resources here
+        self.data = {}
+
+    @Cog.command()
+    async def hello(self, ctx):
+        """Says hello!"""
+        await ctx.reply("Hello from MyCog!")
+
+    @Cog.listener()
+    async def on_message(self, message):
+        """Listens for all messages."""
+        if message.author.bot:
+            return
+        print(f"Message received: {message.content}")
+```
+
+<Note>
+All cogs must call `super().__init__(bot)` in their constructor to properly initialize the cog system.
+</Note>
+
+## The @Cog.command() Decorator
+
+The `@Cog.command()` decorator marks a method as a bot command. Commands in cogs work exactly like regular `@bot.command()` decorators.
+
+```python
+class ModTools(Cog):
+    @Cog.command()
+    async def kick(self, ctx, user_id: int, *, reason: str = None):
+        """Kick a user from the server."""
+        await ctx.guild.kick_member(user_id, reason=reason)
+        await ctx.reply(f"Kicked user {user_id}")
+
+    @Cog.command(name="ban")
+    async def ban_user(self, ctx, user_id: int):
+        """Ban a user. Command will be named 'ban' not 'ban_user'."""
+        await ctx.guild.ban_member(user_id)
+        await ctx.reply(f"Banned user {user_id}")
+```
+
+**Parameters:**
+- `name` (optional): Custom command name. If not provided, uses the method name.
+
+<Note>
+Cog commands automatically receive `self` as the first parameter, followed by `ctx` (the command context).
+</Note>
+
+## The @Cog.listener() Decorator
+
+The `@Cog.listener()` decorator marks a method as an event listener. This allows cogs to respond to gateway events.
+
+```python
+class EventLogger(Cog):
+    @Cog.listener()
+    async def on_message(self, message):
+        """Log all messages."""
+        print(f"[{message.channel.id}] {message.author.username}: {message.content}")
+
+    @Cog.listener()
+    async def on_ready(self):
+        """Called when bot connects."""
+        print(f"Cog {self.__class__.__name__} is ready!")
+
+    @Cog.listener(name="on_message_delete")
+    async def log_deletions(self, message):
+        """Listen for deleted messages."""
+        print(f"Message deleted: {message.id}")
+```
+
+**Parameters:**
+- `name` (optional): Custom event name. If not provided, uses the method name.
+
+<Warning>
+Event listener names must match the event names dispatched by the gateway (e.g., `on_message`, `on_ready`, `on_guild_join`).
+</Warning>
+
+## Loading and Unloading Cogs
+
+Cogs must be loaded onto the bot instance before they become active.
+
+<Steps>
+  <Step title="Create your cog class">
+    Define a class inheriting from `Cog` with commands and listeners.
+
+    ```python
+    class Music(Cog):
+        @Cog.command()
+        async def play(self, ctx, *, song: str):
+            await ctx.reply(f"Playing: {song}")
+    ```
+  </Step>
+
+  <Step title="Load the cog onto the bot">
+    Use `bot.add_cog()` to register the cog.
+
+    ```python
+    bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+    # Load the cog
+    bot.add_cog(Music(bot))
+    ```
+  </Step>
+
+  <Step title="Unload a cog (optional)">
+    Use `bot.remove_cog()` to unregister a cog by its class name.
+
+    ```python
+    bot.remove_cog("Music")
+    ```
+  </Step>
+</Steps>
+
+### Example: Full Bot with Cogs
+
+```python
+import fluxer
+from fluxer import Cog
+
+class Moderation(Cog):
+    @Cog.command()
+    async def ban(self, ctx, user_id: int):
+        await ctx.guild.ban_member(user_id)
+        await ctx.reply(f"Banned user {user_id}")
+
+class Fun(Cog):
+    @Cog.command()
+    async def ping(self, ctx):
+        await ctx.reply("Pong!")
+
+    @Cog.listener()
+    async def on_message(self, message):
+        if "hello" in message.content.lower():
+            await message.channel.send("Hi there!")
+
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+# Load cogs
+bot.add_cog(Moderation(bot))
+bot.add_cog(Fun(bot))
+
+@bot.event
+async def on_ready():
+    print(f"Bot ready as {bot.user.username}")
+
+bot.run("YOUR_BOT_TOKEN")
+```
+
+## Lifecycle Hooks
+
+Cogs can override special methods to run setup and cleanup code.
+
+```python
+class DatabaseCog(Cog):
+    async def cog_load(self):
+        """Called when the cog is loaded."""
+        print("Setting up database connection...")
+        self.db = await connect_to_database()
+
+    async def cog_unload(self):
+        """Called when the cog is unloaded."""
+        print("Closing database connection...")
+        await self.db.close()
+```
+
+### Available Hooks
+
+| Method | Description |
+|--------|-------------|
+| `cog_load()` | Called when the cog is added to the bot |
+| `cog_unload()` | Called when the cog is removed from the bot |
+
+<Note>
+Both hooks are async methods and should be awaited if they perform I/O operations.
+</Note>
+
+## Accessing the Bot Instance
+
+Every cog has access to the bot instance via `self.bot`.
+
+```python
+class Stats(Cog):
+    @Cog.command()
+    async def guilds(self, ctx):
+        """Show how many guilds the bot is in."""
+        guild_count = len(self.bot.guilds)
+        await ctx.reply(f"I'm in {guild_count} guilds!")
+
+    @Cog.command()
+    async def latency(self, ctx):
+        """Show the bot's WebSocket latency."""
+        latency = self.bot.latency
+        await ctx.reply(f"Latency: {latency:.2f}ms")
+```
+
+## Cog Structure Reference
+
+Here's the internal structure of the `Cog` class from `fluxer/cog.py`:
+
+```python
+class Cog:
+    def __init__(self, bot: Bot) -> None:
+        self.bot = bot
+        self._commands: dict[str, EventHandler] = {}
+        self._listeners: dict[str, list[EventHandler]] = {}
+        self._discover_handlers()
+
+    def _discover_handlers(self) -> None:
+        """Discover and register all command and listener methods."""
+        for name in dir(self):
+            if name.startswith("_"):
+                continue
+
+            method = getattr(self, name)
+
+            if hasattr(method, "__cog_command__"):
+                cmd_name = getattr(method, "__cog_command_name__", name)
+                self._commands[cmd_name] = method
+
+            if hasattr(method, "__cog_listener__"):
+                event_name = getattr(method, "__cog_listener_name__", name)
+                if event_name not in self._listeners:
+                    self._listeners[event_name] = []
+                self._listeners[event_name].append(method)
+
+    async def cog_load(self) -> None:
+        """Called when the cog is loaded."""
+        pass
+
+    async def cog_unload(self) -> None:
+        """Called when the cog is unloaded."""
+        pass
+```
+
+## Best Practices
+
+<Steps>
+  <Step title="One cog per feature">
+    Group related commands together. Create separate cogs for moderation, music, games, etc.
+  </Step>
+
+  <Step title="Use cog_load for initialization">
+    Initialize databases, HTTP sessions, or other resources in `cog_load()`.
+  </Step>
+
+  <Step title="Clean up in cog_unload">
+    Close connections and free resources in `cog_unload()`.
+  </Step>
+
+  <Step title="Keep cogs independent">
+    Avoid tight coupling between cogs. Use the bot instance or events to communicate.
+  </Step>
+</Steps>

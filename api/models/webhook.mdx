@@ -1,0 +1,203 @@
+---
+title: 'Webhook'
+description: 'Represents a Fluxer webhook'
+---
+
+## Overview
+
+The `Webhook` class represents a Fluxer webhook. Webhooks allow you to send messages to channels without using a bot token.
+
+## Attributes
+
+<ResponseField name="id" type="int" required>
+  The webhook's unique ID (snowflake).
+</ResponseField>
+
+<ResponseField name="guild_id" type="int" required>
+  The ID of the guild this webhook belongs to.
+</ResponseField>
+
+<ResponseField name="channel_id" type="int" required>
+  The ID of the channel this webhook posts to.
+</ResponseField>
+
+<ResponseField name="user" type="User" required>
+  The user that created this webhook.
+</ResponseField>
+
+<ResponseField name="name" type="str" required>
+  The name of the webhook.
+</ResponseField>
+
+<ResponseField name="avatar" type="str | None">
+  The webhook's avatar hash.
+</ResponseField>
+
+<ResponseField name="token" type="str" required>
+  The secure token for this webhook.
+</ResponseField>
+
+## Methods
+
+### from_data
+
+```python
+@classmethod
+def from_data(
+    cls,
+    data: dict[str, Any],
+    http: HTTPClient | None = None,
+    *,
+    guild_id: int | None = None,
+) -> Webhook
+```
+
+Construct a Webhook from raw API data.
+
+<ParamField path="data" type="dict[str, Any]" required>
+  Raw webhook object from the API.
+</ParamField>
+
+<ParamField path="http" type="HTTPClient | None">
+  HTTPClient for making further requests.
+</ParamField>
+
+<ParamField path="guild_id" type="int | None">
+  Override guild_id if not present in data.
+</ParamField>
+
+### edit
+
+```python
+async def edit(
+    self,
+    *,
+    name: str | None = None,
+    avatar: str | None = None,
+    channel_id: int | None = None,
+) -> Webhook
+```
+
+Edit this webhook.
+
+<ParamField path="name" type="str | None">
+  New webhook name.
+</ParamField>
+
+<ParamField path="avatar" type="str | None">
+  New avatar (base64 data URI).
+</ParamField>
+
+<ParamField path="channel_id" type="int | None">
+  Move webhook to a different channel.
+</ParamField>
+
+**Example:**
+
+```python
+# Edit webhook name
+await webhook.edit(name="New Name")
+```
+
+### send
+
+```python
+async def send(
+    self,
+    content: str | None = None,
+    *,
+    embeds: list[dict[str, Any]] | None = None,
+    username: str | None = None,
+    avatar_url: str | None = None,
+    file: File | None = None,
+    files: list[File] | None = None,
+    wait: bool = False,
+) -> Message | None
+```
+
+Send a message with this webhook.
+
+<ParamField path="content" type="str | None">
+  Text content of the message.
+</ParamField>
+
+<ParamField path="embeds" type="list[dict[str, Any]] | None">
+  List of embed dicts to include.
+</ParamField>
+
+<ParamField path="username" type="str | None">
+  Override the webhook's default name.
+</ParamField>
+
+<ParamField path="avatar_url" type="str | None">
+  Override the webhook's default avatar.
+</ParamField>
+
+<ParamField path="file" type="File | None">
+  A single File object to attach.
+</ParamField>
+
+<ParamField path="files" type="list[File] | None">
+  Multiple File objects to attach.
+</ParamField>
+
+<ParamField path="wait" type="bool">
+  If True, returns the created Message. If False, returns None (default False).
+</ParamField>
+
+**Example:**
+
+```python
+# Send a message with the webhook
+await webhook.send("Hello from webhook!")
+
+# Send with custom username and avatar
+await webhook.send(
+    "Custom message",
+    username="Custom Bot",
+    avatar_url="https://example.com/avatar.png"
+)
+
+# Send and get the message back
+message = await webhook.send("Hello!", wait=True)
+print(f"Sent message: {message.id}")
+```
+
+### delete
+
+```python
+async def delete(self, *, reason: str | None = None) -> None
+```
+
+Delete this webhook.
+
+<ParamField path="reason" type="str | None">
+  Reason for deletion (shows in audit log).
+</ParamField>
+
+**Example:**
+
+```python
+# Delete the webhook
+await webhook.delete(reason="No longer needed")
+```
+
+## Usage Example
+
+```python
+from fluxer import Embed
+
+# Create an embed
+embed = Embed(
+    title="Webhook Message",
+    description="Sent via webhook",
+    color=0x5865F2
+)
+
+# Send with the webhook
+await webhook.send(
+    content="Check out this embed!",
+    embeds=[embed.to_dict()],
+    username="My Webhook Bot"
+)
+```

@@ -1,0 +1,412 @@
+---
+title: Voice Support
+description: Connect to voice channels and play audio in your Fluxer bot
+---
+
+fluxer.py provides voice support through LiveKit, allowing your bot to connect to voice channels and play audio.
+
+## Installation
+
+Voice features require additional dependencies. Install fluxer.py with the voice extra:
+
+<CodeGroup>
+```bash pip
+pip install fluxer.py[voice]
+```
+
+```bash uv
+uv add fluxer.py --extra voice
+```
+</CodeGroup>
+
+### Installing ffmpeg
+
+You also need `ffmpeg` installed on your system and available in your PATH.
+
+<CodeGroup>
+```bash macOS (Homebrew)
+brew install ffmpeg
+```
+
+```bash Debian/Ubuntu
+apt install ffmpeg
+```
+
+```bash Windows (Chocolatey)
+choco install ffmpeg
+```
+</CodeGroup>
+
+<Warning>
+Without ffmpeg, audio playback will fail. Make sure it's installed and accessible from the command line.
+</Warning>
+
+## Connecting to a Voice Channel
+
+To connect to a voice channel, use the `connect()` method on a voice channel object.
+
+```python
+import fluxer
+
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+@bot.command()
+async def join(ctx, channel_id: int):
+    """Join a voice channel."""
+    channel = await bot.fetch_channel(str(channel_id))
+
+    # Connect returns a VoiceClient
+    vc = await channel.connect(bot)
+    await ctx.reply(f"Connected to {channel.name}!")
+```
+
+### Using as a Context Manager
+
+The recommended way to connect is using `async with`, which automatically disconnects when done:
+
+```python
+@bot.command()
+async def play(ctx, channel_id: int, *, path: str):
+    channel = await bot.fetch_channel(str(channel_id))
+
+    async with await channel.connect(bot) as vc:
+        await vc.play_file(path)
+        # Automatically disconnects after playback
+```
+
+<Note>
+Using `async with` ensures the bot disconnects from the voice channel even if an error occurs.
+</Note>
+
+## Playing Audio
+
+There are two methods for playing audio:
+
+### play_file() - Simple Playback
+
+`play_file()` plays an audio file and waits until it finishes.
+
+```python
+@bot.command()
+async def play(ctx, channel_id: int, *, path: str):
+    channel = await bot.fetch_channel(str(channel_id))
+
+    async with await channel.connect(bot) as vc:
+        await vc.play_file(path)
+        await ctx.reply("Finished playing!")
+```
+
+**Signature:**
+```python
+async def play_file(
+    path: str,
+    *,
+    after: Callable[[Exception | None], Any] | None = None
+) -> None
+```
+
+### play() - Background Playback
+
+`play()` starts audio playback in the background, allowing the bot to continue handling commands.
+
+```python
+@bot.command()
+async def background_play(ctx, channel_id: int, *, path: str):
+    channel = await bot.fetch_channel(str(channel_id))
+
+    async with await channel.connect(bot) as vc:
+        def finished(error):
+            if error:
+                print(f"Playback error: {error}")
+            else:
+                print("Playback finished!")
+
+        vc.play(
+            fluxer.FFmpegPCMAudio(path),
+            after=finished
+        )
+
+        # Bot continues executing while audio plays
+        await ctx.reply("Now playing in the background!")
+```
+
+**Signature:**
+```python
+async def play(
+    source: FFmpegPCMAudio | rtc.AudioSource,
+    *,
+    after: Callable[[Exception | None], Any] | None = None
+) -> None
+```
+
+<Note>
+The `after` callback is called when playback finishes or encounters an error. It receives `None` on success or an `Exception` on failure.
+</Note>
+
+## FFmpegPCMAudio Options
+
+The `FFmpegPCMAudio` class provides fine-grained control over audio processing.
+
+```python
+from fluxer import FFmpegPCMAudio
+
+source = FFmpegPCMAudio(
+    "music.mp3",
+    executable="ffmpeg",           # Path to ffmpeg binary
+    before_options="-ss 30",       # Start at 30 seconds
+    options="-filter:a volume=0.5", # Reduce volume by 50%
+    sample_rate=48000,             # 48kHz (Fluxer standard)
+    num_channels=2                 # Stereo
+)
+
+vc.play(source)
+```
+
+### Constructor Parameters
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `path` | `str` | Required | Path to the audio file |
+| `executable` | `str` | `"ffmpeg"` | Path to ffmpeg binary |
+| `before_options` | `str \| None` | `None` | ffmpeg arguments before `-i` (e.g., seeking) |
+| `options` | `str \| None` | `None` | ffmpeg arguments after the source (e.g., filters) |
+| `sample_rate` | `int` | `48000` | Output sample rate in Hz |
+| `num_channels` | `int` | `2` | `1` for mono, `2` for stereo |
+
+### Common Use Cases
+
+<CodeGroup>
+```python Seek to 30 seconds
+source = FFmpegPCMAudio(
+    "podcast.mp3",
+    before_options="-ss 30"
+)
+```
+
+```python Adjust volume
+source = FFmpegPCMAudio(
+    "music.mp3",
+    options="-filter:a volume=0.5"  # 50% volume
+)
+```
+
+```python Convert to mono
+source = FFmpegPCMAudio(
+    "audio.wav",
+    num_channels=1
+)
+```
+
+```python Custom ffmpeg path
+source = FFmpegPCMAudio(
+    "sound.ogg",
+    executable="/usr/local/bin/ffmpeg"
+)
+```
+</CodeGroup>
+
+## Pause and Resume
+
+You can pause and resume playback mid-stream.
+
+```python
+@bot.command()
+async def music(ctx, channel_id: int):
+    channel = await bot.fetch_channel(str(channel_id))
+
+    async with await channel.connect(bot) as vc:
+        vc.play(fluxer.FFmpegPCMAudio("song.mp3"))
+
+        await ctx.reply("Playing music! Use !pause and !resume to control.")
+
+@bot.command()
+async def pause(ctx):
+    # Get the voice client from bot state
+    vc = bot.voice_clients.get(ctx.guild.id)
+    if vc:
+        vc.pause()
+        await ctx.reply("Paused.")
+
+@bot.command()
+async def resume(ctx):
+    vc = bot.voice_clients.get(ctx.guild.id)
+    if vc:
+        vc.resume()
+        await ctx.reply("Resumed.")
+```
+
+### Playback State Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `is_playing` | `bool` | Whether audio is currently playing |
+| `is_paused` | `bool` | Whether playback is paused |
+| `is_connected` | `bool` | Whether connected to a voice channel |
+
+```python
+if vc.is_playing:
+    print("Audio is playing")
+
+if vc.is_paused:
+    vc.resume()
+
+if not vc.is_connected:
+    await channel.connect(bot)
+```
+
+## VoiceClient Reference
+
+The `VoiceClient` class manages the voice connection and playback.
+
+```python
+class VoiceClient:
+    def __init__(self, guild_id: int, channel_id: int, gateway: Gateway) -> None:
+        self._guild_id = guild_id
+        self._channel_id = channel_id
+        self._gateway = gateway
+        self._room: rtc.Room | None = None
+        self._connected = asyncio.Event()
+        self._current_track: rtc.LocalAudioTrack | None = None
+        self._current_publication: rtc.LocalTrackPublication | None = None
+        self._resume_event = asyncio.Event()
+        self._resume_event.set()
+        self._playback_task: asyncio.Task[None] | None = None
+
+    @property
+    def is_connected(self) -> bool:
+        return self._room is not None and self._connected.is_set()
+
+    @property
+    def is_playing(self) -> bool:
+        return self._current_publication is not None
+
+    @property
+    def is_paused(self) -> bool:
+        return self._current_publication is not None and not self._resume_event.is_set()
+
+    @property
+    def channel_id(self) -> int:
+        return self._channel_id
+
+    @property
+    def guild_id(self) -> int:
+        return self._guild_id
+
+    def pause(self) -> None:
+        self._resume_event.clear()
+
+    def resume(self) -> None:
+        self._resume_event.set()
+
+    async def stop(self) -> None:
+        # Stops playback
+        ...
+
+    async def disconnect(self) -> None:
+        # Disconnects from the voice channel
+        ...
+```
+
+## Error Handling
+
+Always handle errors when working with voice connections.
+
+```python
+import fluxer
+from fluxer.errors import FluxerException
+
+@bot.command()
+async def safe_play(ctx, channel_id: int, path: str):
+    try:
+        channel = await bot.fetch_channel(str(channel_id))
+
+        async with await channel.connect(bot) as vc:
+            await vc.play_file(path)
+            await ctx.reply("Playback finished!")
+
+    except FileNotFoundError:
+        await ctx.reply(f"Audio file not found: {path}")
+    except FluxerException as e:
+        await ctx.reply(f"Voice error: {e}")
+    except Exception as e:
+        await ctx.reply(f"Unexpected error: {e}")
+```
+
+<Warning>
+If ffmpeg is not installed or the audio file doesn't exist, `play_file()` will raise an exception.
+</Warning>
+
+## Complete Example
+
+Here's a complete music bot with queue support:
+
+```python
+import asyncio
+import fluxer
+from fluxer import FFmpegPCMAudio
+
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+queue = []
+
+@bot.command()
+async def join(ctx, channel_id: int):
+    """Join a voice channel."""
+    channel = await bot.fetch_channel(str(channel_id))
+    await channel.connect(bot)
+    await ctx.reply(f"Joined {channel.name}")
+
+@bot.command()
+async def play(ctx, *, song: str):
+    """Add a song to the queue and play it."""
+    queue.append(song)
+    await ctx.reply(f"Added to queue: {song}")
+
+    vc = bot.voice_clients.get(ctx.guild.id)
+    if vc and not vc.is_playing:
+        await play_next(ctx)
+
+async def play_next(ctx):
+    """Play the next song in the queue."""
+    if not queue:
+        return
+
+    song = queue.pop(0)
+    vc = bot.voice_clients.get(ctx.guild.id)
+
+    def after_play(error):
+        if error:
+            print(f"Error playing {song}: {error}")
+
+        # Play next song
+        asyncio.create_task(play_next(ctx))
+
+    vc.play(FFmpegPCMAudio(song), after=after_play)
+    await ctx.send(f"Now playing: {song}")
+
+@bot.command()
+async def pause(ctx):
+    """Pause playback."""
+    vc = bot.voice_clients.get(ctx.guild.id)
+    if vc and vc.is_playing:
+        vc.pause()
+        await ctx.reply("Paused.")
+
+@bot.command()
+async def resume(ctx):
+    """Resume playback."""
+    vc = bot.voice_clients.get(ctx.guild.id)
+    if vc and vc.is_paused:
+        vc.resume()
+        await ctx.reply("Resumed.")
+
+@bot.command()
+async def leave(ctx):
+    """Leave the voice channel."""
+    vc = bot.voice_clients.get(ctx.guild.id)
+    if vc:
+        await vc.disconnect()
+        await ctx.reply("Disconnected.")
+
+bot.run("YOUR_BOT_TOKEN")
+```

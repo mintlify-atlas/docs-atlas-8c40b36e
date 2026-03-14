@@ -1,0 +1,522 @@
+---
+title: Intents
+description: Understanding gateway intents in fluxer.py
+---
+
+## Overview
+
+Intents are bitflags that control which events your bot receives from the Fluxer gateway. They act as event filters, improving performance and ensuring your bot only subscribes to the events it needs.
+
+<Warning>
+Without the correct intents, your bot won't receive certain events. For example, to read message content, you need the `MESSAGE_CONTENT` intent.
+</Warning>
+
+## Why Intents Matter
+
+- **Performance**: Reduces bandwidth by only receiving relevant events
+- **Privacy**: Limits access to sensitive data like message content and guild member lists
+- **Best Practice**: Only request intents your bot actually uses
+
+## Creating Intents
+
+### Default Intents
+
+The recommended starting point for most bots:
+
+```python
+import fluxer
+
+bot = fluxer.Bot(
+    command_prefix="!",
+    intents=fluxer.Intents.default()
+)
+```
+
+Default intents **exclude** privileged intents:
+- `GUILD_MEMBERS`
+- `GUILD_PRESENCES`
+- `MESSAGE_CONTENT`
+
+### All Intents
+
+Enables every available intent:
+
+```python
+bot = fluxer.Bot(
+    command_prefix="!",
+    intents=fluxer.Intents.all()
+)
+```
+
+<Note>
+Privileged intents (like `MESSAGE_CONTENT`) may require additional authorization from the Fluxer API.
+</Note>
+
+### No Intents
+
+Creates an empty intent set (receives minimal events):
+
+```python
+intents = fluxer.Intents.none()
+```
+
+## Combining Intents
+
+Intents use bitwise operators to combine flags:
+
+### Using Bitwise OR (`|`)
+
+```python
+import fluxer
+
+# Only guild and message events
+intents = fluxer.Intents.GUILDS | fluxer.Intents.GUILD_MESSAGES
+
+# Multiple intents
+intents = (
+    fluxer.Intents.GUILDS
+    | fluxer.Intents.GUILD_MESSAGES
+    | fluxer.Intents.GUILD_VOICE_STATES
+    | fluxer.Intents.MESSAGE_CONTENT
+)
+
+bot = fluxer.Bot(command_prefix="!", intents=intents)
+```
+
+### Adding Intents to Default
+
+```python
+# Start with defaults and add privileged intents
+intents = fluxer.Intents.default()
+intents |= fluxer.Intents.MESSAGE_CONTENT
+intents |= fluxer.Intents.GUILD_MEMBERS
+
+bot = fluxer.Bot(command_prefix="!", intents=intents)
+```
+
+### Removing Intents
+
+Use bitwise XOR (`^`) to remove specific intents:
+
+```python
+# All intents except message reactions
+intents = fluxer.Intents.all()
+intents ^= fluxer.Intents.GUILD_MESSAGE_REACTIONS
+intents ^= fluxer.Intents.DIRECT_MESSAGE_REACTIONS
+
+bot = fluxer.Bot(command_prefix="!", intents=intents)
+```
+
+## Available Intent Flags
+
+From `fluxer/enums.py:33-58`:
+
+```python
+class Intents(enum.IntFlag):
+    """Gateway intents control which events your bot receives.
+
+    Usage:
+        intents = Intents.GUILDS | Intents.GUILD_MESSAGES
+        intents = Intents.default()
+        intents = Intents.all()
+    """
+
+    GUILDS = 1 << 0
+    GUILD_MEMBERS = 1 << 1
+    GUILD_MODERATION = 1 << 2
+    GUILD_EMOJIS_AND_STICKERS = 1 << 3
+    GUILD_INTEGRATIONS = 1 << 4
+    GUILD_WEBHOOKS = 1 << 5
+    GUILD_INVITES = 1 << 6
+    GUILD_VOICE_STATES = 1 << 7
+    GUILD_PRESENCES = 1 << 8
+    GUILD_MESSAGES = 1 << 9
+    GUILD_MESSAGE_REACTIONS = 1 << 10
+    GUILD_MESSAGE_TYPING = 1 << 11
+    DIRECT_MESSAGES = 1 << 12
+    DIRECT_MESSAGE_REACTIONS = 1 << 13
+    DIRECT_MESSAGE_TYPING = 1 << 14
+    MESSAGE_CONTENT = 1 << 15
+```
+
+## Intent Descriptions
+
+### GUILDS
+
+<ParamField path="GUILDS" type="int" default="1 << 0">
+  Enables guild-related events:
+  - `GUILD_CREATE`
+  - `GUILD_UPDATE`
+  - `GUILD_DELETE`
+  - `GUILD_ROLE_CREATE`
+  - `GUILD_ROLE_UPDATE`
+  - `GUILD_ROLE_DELETE`
+  - `CHANNEL_CREATE`
+  - `CHANNEL_UPDATE`
+  - `CHANNEL_DELETE`
+</ParamField>
+
+<Info>
+The `GUILDS` intent is essential for most bots and is included in `Intents.default()`.
+</Info>
+
+### GUILD_MEMBERS (Privileged)
+
+<ParamField path="GUILD_MEMBERS" type="int" default="1 << 1">
+  Enables member-related events:
+  - `GUILD_MEMBER_ADD`
+  - `GUILD_MEMBER_UPDATE`
+  - `GUILD_MEMBER_REMOVE`
+</ParamField>
+
+<Warning>
+This is a **privileged intent** and may require verification for larger bots.
+</Warning>
+
+### GUILD_MODERATION
+
+<ParamField path="GUILD_MODERATION" type="int" default="1 << 2">
+  Enables moderation events:
+  - `GUILD_BAN_ADD`
+  - `GUILD_BAN_REMOVE`
+</ParamField>
+
+### GUILD_EMOJIS_AND_STICKERS
+
+<ParamField path="GUILD_EMOJIS_AND_STICKERS" type="int" default="1 << 3">
+  Enables emoji and sticker events:
+  - `GUILD_EMOJIS_UPDATE`
+  - `GUILD_STICKERS_UPDATE`
+</ParamField>
+
+### GUILD_INTEGRATIONS
+
+<ParamField path="GUILD_INTEGRATIONS" type="int" default="1 << 4">
+  Enables integration events:
+  - `GUILD_INTEGRATIONS_UPDATE`
+  - `INTEGRATION_CREATE`
+  - `INTEGRATION_UPDATE`
+  - `INTEGRATION_DELETE`
+</ParamField>
+
+### GUILD_WEBHOOKS
+
+<ParamField path="GUILD_WEBHOOKS" type="int" default="1 << 5">
+  Enables webhook events:
+  - `WEBHOOKS_UPDATE`
+</ParamField>
+
+### GUILD_INVITES
+
+<ParamField path="GUILD_INVITES" type="int" default="1 << 6">
+  Enables invite events:
+  - `INVITE_CREATE`
+  - `INVITE_DELETE`
+</ParamField>
+
+### GUILD_VOICE_STATES
+
+<ParamField path="GUILD_VOICE_STATES" type="int" default="1 << 7">
+  Enables voice state events:
+  - `VOICE_STATE_UPDATE`
+</ParamField>
+
+<Info>
+Required for voice functionality and tracking users in voice channels.
+</Info>
+
+### GUILD_PRESENCES (Privileged)
+
+<ParamField path="GUILD_PRESENCES" type="int" default="1 << 8">
+  Enables presence updates:
+  - `PRESENCE_UPDATE`
+</ParamField>
+
+<Warning>
+This is a **privileged intent** and may require verification for larger bots.
+</Warning>
+
+### GUILD_MESSAGES
+
+<ParamField path="GUILD_MESSAGES" type="int" default="1 << 9">
+  Enables message events in guilds:
+  - `MESSAGE_CREATE`
+  - `MESSAGE_UPDATE`
+  - `MESSAGE_DELETE`
+  - `MESSAGE_DELETE_BULK`
+</ParamField>
+
+<Note>
+This intent enables message events, but `MESSAGE_CONTENT` is required to access the actual content.
+</Note>
+
+### GUILD_MESSAGE_REACTIONS
+
+<ParamField path="GUILD_MESSAGE_REACTIONS" type="int" default="1 << 10">
+  Enables reaction events in guilds:
+  - `MESSAGE_REACTION_ADD`
+  - `MESSAGE_REACTION_REMOVE`
+  - `MESSAGE_REACTION_REMOVE_ALL`
+  - `MESSAGE_REACTION_REMOVE_EMOJI`
+</ParamField>
+
+### GUILD_MESSAGE_TYPING
+
+<ParamField path="GUILD_MESSAGE_TYPING" type="int" default="1 << 11">
+  Enables typing indicator events in guilds:
+  - `TYPING_START`
+</ParamField>
+
+### DIRECT_MESSAGES
+
+<ParamField path="DIRECT_MESSAGES" type="int" default="1 << 12">
+  Enables DM message events:
+  - `MESSAGE_CREATE`
+  - `MESSAGE_UPDATE`
+  - `MESSAGE_DELETE`
+  - `CHANNEL_CREATE` (for DM channels)
+</ParamField>
+
+### DIRECT_MESSAGE_REACTIONS
+
+<ParamField path="DIRECT_MESSAGE_REACTIONS" type="int" default="1 << 13">
+  Enables reaction events in DMs:
+  - `MESSAGE_REACTION_ADD`
+  - `MESSAGE_REACTION_REMOVE`
+  - `MESSAGE_REACTION_REMOVE_ALL`
+  - `MESSAGE_REACTION_REMOVE_EMOJI`
+</ParamField>
+
+### DIRECT_MESSAGE_TYPING
+
+<ParamField path="DIRECT_MESSAGE_TYPING" type="int" default="1 << 14">
+  Enables typing indicator events in DMs:
+  - `TYPING_START`
+</ParamField>
+
+### MESSAGE_CONTENT (Privileged)
+
+<ParamField path="MESSAGE_CONTENT" type="int" default="1 << 15">
+  Enables access to message content in:
+  - `MESSAGE_CREATE`
+  - `MESSAGE_UPDATE`
+</ParamField>
+
+<Warning>
+This is a **privileged intent**. Without it, message content will be empty for most messages.
+</Warning>
+
+<Info>
+Bots always receive message content for:
+- Messages that mention the bot
+- DMs to the bot
+- Messages from the bot itself
+</Info>
+
+## Helper Methods
+
+### default()
+
+Returns a sensible default set of intents (excludes privileged ones):
+
+```python
+@classmethod
+def default(cls) -> Intents:
+    """Returns a sensible default set of intents (excludes privileged ones)."""
+    value = cls(0)
+    for intent in cls:
+        if intent not in (
+            cls.GUILD_MEMBERS,
+            cls.GUILD_PRESENCES,
+            cls.MESSAGE_CONTENT,
+        ):
+            value |= intent
+    return value
+```
+
+### all()
+
+Returns all intents enabled:
+
+```python
+@classmethod
+def all(cls) -> Intents:
+    """Returns all intents enabled."""
+    value = cls(0)
+    for intent in cls:
+        value |= intent
+    return value
+```
+
+### none()
+
+Returns no intents:
+
+```python
+@classmethod
+def none(cls) -> Intents:
+    """Returns no intents."""
+    return cls(0)
+```
+
+## Common Intent Combinations
+
+### Basic Message Bot
+
+```python
+intents = (
+    fluxer.Intents.GUILDS
+    | fluxer.Intents.GUILD_MESSAGES
+    | fluxer.Intents.MESSAGE_CONTENT
+)
+```
+
+### Moderation Bot
+
+```python
+intents = (
+    fluxer.Intents.GUILDS
+    | fluxer.Intents.GUILD_MEMBERS
+    | fluxer.Intents.GUILD_MODERATION
+    | fluxer.Intents.GUILD_MESSAGES
+    | fluxer.Intents.MESSAGE_CONTENT
+)
+```
+
+### Voice Bot
+
+```python
+intents = (
+    fluxer.Intents.GUILDS
+    | fluxer.Intents.GUILD_VOICE_STATES
+    | fluxer.Intents.GUILD_MESSAGES
+    | fluxer.Intents.MESSAGE_CONTENT
+)
+```
+
+### Minimal Bot (No Messages)
+
+```python
+intents = fluxer.Intents.GUILDS
+```
+
+## Checking Intents
+
+You can check if specific intents are enabled:
+
+```python
+intents = fluxer.Intents.default()
+
+# Check if an intent is enabled
+if intents & fluxer.Intents.GUILD_MESSAGES:
+    print("Guild messages enabled")
+
+if intents & fluxer.Intents.MESSAGE_CONTENT:
+    print("Message content enabled")
+else:
+    print("Message content NOT enabled")
+```
+
+## Privileged Intents
+
+Three intents are considered **privileged** and may require additional setup:
+
+1. **GUILD_MEMBERS**: Access to member lists and events
+2. **GUILD_PRESENCES**: Access to user presence data (online status, activities)
+3. **MESSAGE_CONTENT**: Access to message content
+
+<Warning>
+For bots in 100+ guilds, privileged intents require verification and approval from the Fluxer API team.
+</Warning>
+
+## Intent Errors
+
+If you request intents your bot doesn't have access to, the gateway will close with error code `4014 (DISALLOWED_INTENTS)`:
+
+```python
+class GatewayCloseCode(enum.IntEnum):
+    INVALID_INTENTS = 4013
+    DISALLOWED_INTENTS = 4014
+```
+
+From `gateway.py:231-244`:
+
+```python
+async def _handle_close_code(self, code: int) -> None:
+    """Handle a WebSocket close code from the gateway."""
+    log.info("Gateway closed with code %d", code)
+
+    try:
+        close_code = GatewayCloseCode(code)
+        if not close_code.is_reconnectable:
+            log.error(
+                "Fatal close code %d (%s), not reconnecting", code, close_code.name
+            )
+            self._is_closed = True
+    except ValueError:
+        # Unknown close code, try to reconnect
+        log.warning("Unknown close code %d, attempting reconnect", code)
+```
+
+## Best Practices
+
+<Card title="Only Request What You Need" icon="check">
+  Start with `Intents.default()` and only add privileged intents if your bot actually uses them.
+</Card>
+
+<Card title="Message Content" icon="message">
+  If your bot uses prefix commands or reads message content, enable `MESSAGE_CONTENT`.
+</Card>
+
+<Card title="Voice Bots" icon="microphone">
+  Music and voice bots need `GUILD_VOICE_STATES` to track voice channels.
+</Card>
+
+<Card title="Moderation Bots" icon="shield">
+  Moderation bots typically need `GUILD_MEMBERS` and `GUILD_MODERATION`.
+</Card>
+
+## Example: Complete Bot
+
+```python
+import fluxer
+
+# Configure intents for a message and moderation bot
+intents = (
+    fluxer.Intents.GUILDS
+    | fluxer.Intents.GUILD_MEMBERS
+    | fluxer.Intents.GUILD_MESSAGES
+    | fluxer.Intents.GUILD_MODERATION
+    | fluxer.Intents.MESSAGE_CONTENT
+)
+
+bot = fluxer.Bot(command_prefix="!", intents=intents)
+
+@bot.event
+async def on_ready():
+    print(f"Logged in as {bot.user.username}")
+
+@bot.event
+async def on_member_join(data):
+    # Requires GUILD_MEMBERS intent
+    user = data['user']
+    print(f"{user['username']} joined!")
+
+@bot.command()
+async def ping(ctx):
+    # Requires GUILD_MESSAGES and MESSAGE_CONTENT intents
+    await ctx.reply("Pong!")
+
+bot.run("your_token_here")
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Events" icon="bolt" href="/concepts/events">
+    Learn about events enabled by each intent
+  </Card>
+  <Card title="Client vs Bot" icon="book" href="/concepts/client-vs-bot">
+    Choose the right class for your application
+  </Card>
+</CardGroup>

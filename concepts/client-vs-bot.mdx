@@ -1,0 +1,334 @@
+---
+title: Client vs Bot
+description: Understanding the difference between Client and Bot classes in fluxer.py
+---
+
+## Overview
+
+fluxer.py provides two main classes for building applications: **Client** and **Bot**.
+
+- **Client** is the low-level, event-driven interface that gives you full control over the gateway lifecycle
+- **Bot** extends Client and adds a command framework, prefix commands, and cog support for rapid bot development
+
+<Info>
+**Bot** inherits from **Client**, so everything available in Client is also available in Bot.
+</Info>
+
+## When to Use Each
+
+### Use Client When:
+
+- You need full event-driven control
+- You want to build a custom command framework
+- You're building lower-level API interactions
+- You need advanced or specialized implementations
+- You want minimal abstraction over the Fluxer API
+
+### Use Bot When:
+
+- You need decorator-based commands (`@bot.command()`)
+- You want built-in command parsing
+- You need cog support for modular command organization
+- You're doing rapid bot development
+- You want convenience features like command prefixes
+
+## Architecture
+
+```
+┌─────────┐
+│  Client │  ← Low-level event-driven interface
+└────┬────┘
+     │
+     │ extends
+     │
+┌────▼────┐
+│   Bot   │  ← High-level command framework
+└─────────┘
+```
+
+## Comparison
+
+<Tabs>
+  <Tab title="Client">
+    ```python
+    import fluxer
+
+    # Create a low-level client
+    client = fluxer.Client(intents=fluxer.Intents.default())
+
+    @client.event
+    async def on_ready():
+        print(f"Logged in as {client.user.username}")
+
+    @client.event
+    async def on_message(message):
+        # Manual command parsing
+        if message.content.startswith("!ping"):
+            await message.reply("Pong!")
+        
+        elif message.content.startswith("!hello"):
+            await message.reply(f"Hello, {message.author.username}!")
+
+    client.run("your_token_here")
+    ```
+
+    **Pros:**
+    - Full control over event handling
+    - No automatic command processing
+    - Minimal overhead
+    - Great for custom frameworks
+
+    **Cons:**
+    - Manual command parsing required
+    - No built-in command framework
+    - More boilerplate code
+  </Tab>
+
+  <Tab title="Bot">
+    ```python
+    import fluxer
+
+    # Create a bot with command support
+    bot = fluxer.Bot(
+        command_prefix="!",
+        intents=fluxer.Intents.default()
+    )
+
+    @bot.event
+    async def on_ready():
+        print(f"Bot is ready! Logged in as {bot.user.username}")
+
+    @bot.command()
+    async def ping(ctx):
+        """Simple ping command"""
+        await ctx.reply("Pong!")
+
+    @bot.command(name="hello")
+    async def greet(ctx):
+        """Greet the user"""
+        await ctx.reply(f"Hello, {ctx.author.username}!")
+
+    bot.run("your_token_here")
+    ```
+
+    **Pros:**
+    - Automatic command parsing
+    - Decorator-based command registration
+    - Built-in argument parsing
+    - Cog support for modular code
+    - Less boilerplate
+
+    **Cons:**
+    - Slightly more overhead
+    - Automatic message processing
+  </Tab>
+</Tabs>
+
+## Class Signatures
+
+### Client
+
+```python
+class Client:
+    """Low-level client that connects to Fluxer and dispatches events.
+
+    This gives you full control over the gateway lifecycle.
+    For most bots, use the Bot subclass instead.
+
+    Args:
+        intents: Gateway intents to request (default: Intents.default())
+        api_url: Base URL for the Fluxer API (default: https://api.fluxer.app/v1)
+                 Use this to connect to self-hosted Fluxer instances
+    """
+
+    def __init__(
+        self,
+        *,
+        intents: Intents = Intents.default(),
+        api_url: str | None = None,
+        max_retries: int = 5,
+        retry_forever: bool = False,
+    ) -> None:
+        ...
+```
+
+<ParamField path="intents" type="Intents" default="Intents.default()">
+  Gateway intents that control which events your application receives
+</ParamField>
+
+<ParamField path="api_url" type="str | None" default="None">
+  Base URL for the Fluxer API. Use this to connect to self-hosted instances
+</ParamField>
+
+<ParamField path="max_retries" type="int" default="5">
+  Maximum number of retries for HTTP requests
+</ParamField>
+
+<ParamField path="retry_forever" type="bool" default="False">
+  Whether to retry HTTP requests indefinitely
+</ParamField>
+
+### Bot
+
+```python
+class Bot(Client):
+    """Extended Client with common bot conveniences.
+
+    Adds prefix command support, cog support, and other bot-specific features.
+    This is the recommended class for most bot use cases.
+
+    Args:
+        command_prefix: Prefix for text commands (default: "!")
+        intents: Gateway intents to request (default: Intents.default())
+        api_url: Base URL for the Fluxer API (default: https://api.fluxer.app/v1)
+                 Use this to connect to self-hosted Fluxer instances
+        max_retries: Maximum number of retries for HTTP requests (default: 4)
+        retry_forever: Whether to retry HTTP requests indefinitely (default: False)
+    """
+
+    def __init__(
+        self,
+        *,
+        command_prefix: str = "!",
+        intents: Intents = Intents.default(),
+        api_url: str | None = None,
+        max_retries: int = 4,
+        retry_forever: bool = False,
+    ) -> None:
+        ...
+```
+
+<ParamField path="command_prefix" type="str" default="!">
+  The prefix for text-based commands (e.g., "!", "?", ">>")
+</ParamField>
+
+<ParamField path="intents" type="Intents" default="Intents.default()">
+  Gateway intents that control which events your application receives
+</ParamField>
+
+<ParamField path="api_url" type="str | None" default="None">
+  Base URL for the Fluxer API. Use this to connect to self-hosted instances
+</ParamField>
+
+<ParamField path="max_retries" type="int" default="4">
+  Maximum number of retries for HTTP requests
+</ParamField>
+
+<ParamField path="retry_forever" type="bool" default="False">
+  Whether to retry HTTP requests indefinitely
+</ParamField>
+
+## Common Methods
+
+Both Client and Bot share these methods:
+
+### Connection Lifecycle
+
+```python
+async def start(token: str) -> None:
+    """Connect to Fluxer and start receiving events (async version)."""
+
+def run(token: str) -> None:
+    """Blocking call that connects to Fluxer and runs the bot."""
+
+async def close() -> None:
+    """Disconnect from the gateway and clean up resources."""
+```
+
+### Event Registration
+
+```python
+@client.event
+async def on_ready():
+    print("Ready!")
+
+@client.on("message")
+async def handle_message(message):
+    print(f"Message: {message.content}")
+```
+
+### Fetching Resources
+
+```python
+await client.fetch_channel(channel_id)   # Fetch a channel
+await client.fetch_guild(guild_id)       # Fetch a guild
+await client.fetch_user(user_id)         # Fetch a user
+await client.fetch_message(channel_id, message_id)  # Fetch a message
+```
+
+## Properties
+
+<ParamField path="user" type="User | None">
+  The bot user, available after the READY event
+</ParamField>
+
+<ParamField path="guilds" type="list[Guild]">
+  List of guilds the bot is in (populated from READY + GUILD_CREATE)
+</ParamField>
+
+## Migration from Client to Bot
+
+If you start with Client and want to migrate to Bot:
+
+```python
+# Before (Client)
+client = fluxer.Client(intents=fluxer.Intents.default())
+
+@client.event
+async def on_message(message):
+    if message.content == "!ping":
+        await message.reply("Pong!")
+
+client.run(TOKEN)
+```
+
+```python
+# After (Bot)
+bot = fluxer.Bot(
+    command_prefix="!",
+    intents=fluxer.Intents.default()
+)
+
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+
+bot.run(TOKEN)
+```
+
+<Note>
+When using Bot, the `on_message` event is automatically registered to process commands. You can still add your own `on_message` handlers, but they will run alongside command processing.
+</Note>
+
+## Self-Hosted Fluxer Instances
+
+Both Client and Bot support connecting to self-hosted Fluxer instances:
+
+```python
+# Connect to a self-hosted instance
+client = fluxer.Client(
+    intents=fluxer.Intents.default(),
+    api_url="https://your-fluxer-instance.com/api/v1"
+)
+
+# Or with Bot
+bot = fluxer.Bot(
+    command_prefix="!",
+    intents=fluxer.Intents.default(),
+    api_url="https://your-fluxer-instance.com/api/v1"
+)
+```
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Events" icon="bolt" href="/concepts/events">
+    Learn about the event system and available events
+  </Card>
+  <Card title="Commands" icon="terminal" href="/concepts/commands">
+    Deep dive into the command framework
+  </Card>
+  <Card title="Intents" icon="filter" href="/concepts/intents">
+    Understand gateway intents and event filtering
+  </Card>
+</CardGroup>

@@ -1,0 +1,317 @@
+---
+title: 'Basic Bot Example'
+description: 'Complete bot example with commands and event handlers'
+---
+
+## Overview
+
+This guide shows you how to build a complete bot using fluxer.py's `Bot` class. You'll learn how to:
+
+- Set up event handlers like `on_ready` and `on_message`
+- Create commands with different parameter patterns
+- Handle user input with type conversion
+- Use the bot's command framework
+
+## Quick Start
+
+Here's a simple bot with a ping command:
+
+```python
+import fluxer
+
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+@bot.event
+async def on_ready():
+    print(f"Bot is ready! Logged in as {bot.user.username}")
+
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+
+if __name__ == "__main__":
+    TOKEN = "your_bot_token"
+    bot.run(TOKEN)
+```
+
+<Tip>
+The `Bot` class extends `Client` and adds a command framework on top of the core event system.
+</Tip>
+
+## Event Handlers
+
+Use the `@bot.event` decorator to register event handlers. The function name determines which event it handles:
+
+```python
+@bot.event
+async def on_ready():
+    print(f"Bot is ready! Logged in as {bot.user.username}")
+    print(f"Guilds: {len(bot.guilds)}")
+
+@bot.event
+async def on_message(message):
+    # This fires for EVERY message
+    # Be careful - the command processor runs automatically
+    if message.author.bot:
+        return
+    
+    if "hello" in message.content.lower():
+        await message.reply("Hello there!")
+
+@bot.event
+async def on_guild_join(guild):
+    print(f"Joined guild: {guild.name}")
+
+@bot.event
+async def on_guild_remove(guild):
+    print(f"Left guild: {guild.name if hasattr(guild, 'name') else guild}")
+```
+
+### Supported Events
+
+The following events are available:
+
+| Event | Trigger |
+|-------|--------|
+| `on_ready` | Bot successfully connected to gateway |
+| `on_message` | New message created |
+| `on_message_edit` | Message was edited |
+| `on_message_delete` | Message was deleted |
+| `on_guild_join` | Bot joined a guild |
+| `on_guild_remove` | Bot left a guild |
+| `on_member_join` | User joined a guild |
+| `on_member_remove` | User left a guild |
+| `on_channel_create` | Channel was created |
+| `on_channel_update` | Channel was updated |
+| `on_channel_delete` | Channel was deleted |
+| `on_voice_state_update` | User's voice state changed |
+| `on_resumed` | Gateway connection resumed |
+
+<Note>
+You can also listen to raw events using `on_{event_name}` where `{event_name}` is the lowercase version of any gateway event.
+</Note>
+
+## Command Patterns
+
+### Simple Commands
+
+Commands without parameters:
+
+```python
+@bot.command()
+async def ping(ctx):
+    await ctx.reply("Pong!")
+
+@bot.command(name="info")
+async def bot_info(ctx):
+    await ctx.reply(f"Running fluxer.py | {len(bot.guilds)} guilds")
+```
+
+### Commands with Arguments
+
+Positional arguments are parsed from the command:
+
+```python
+@bot.command()
+async def add(ctx, a: int, b: int):
+    result = a + b
+    await ctx.reply(f"{a} + {b} = {result}")
+
+@bot.command()
+async def greet(ctx, name: str):
+    await ctx.reply(f"Hello, {name}!")
+```
+
+<Tip>
+Type hints (`int`, `float`, `bool`, `str`) automatically convert arguments to the correct type.
+</Tip>
+
+### Keyword-Only Arguments
+
+Use `*` to capture all remaining text as a single argument:
+
+```python
+@bot.command()
+async def say(ctx, *, message: str):
+    """Repeat a message."""
+    await ctx.reply(message)
+
+@bot.command()
+async def announce(ctx, *, text: str):
+    """Send an announcement."""
+    await ctx.send(f"📢 **Announcement:** {text}")
+```
+
+This is useful for commands that take a message or sentence as input, since users don't need to quote the text.
+
+### Default Values
+
+Provide default values for optional parameters:
+
+```python
+@bot.command()
+async def repeat(ctx, text: str, times: int = 3):
+    await ctx.reply(text * times)
+
+# Usage:
+# !repeat hello     -> "hellohellohello"
+# !repeat hello 5   -> "hellohellohellohellohello"
+```
+
+## Complete Example
+
+Here's a full bot with multiple command types and event handlers:
+
+```python
+import fluxer
+
+bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+
+# Event handlers
+@bot.event
+async def on_ready():
+    print(f"Bot is ready! Logged in as {bot.user.username}")
+    print(f"Connected to {len(bot.guilds)} guilds")
+
+@bot.event
+async def on_message(message):
+    # Custom message handling (runs before commands)
+    if message.author.bot:
+        return
+    
+    if "hello bot" in message.content.lower():
+        await message.reply("Hello! Use !help to see my commands.")
+
+@bot.event
+async def on_guild_join(guild):
+    print(f"Joined new guild: {guild.name} (ID: {guild.id})")
+
+# Simple commands
+@bot.command()
+async def ping(ctx):
+    """Check if the bot is responsive."""
+    await ctx.reply("Pong! 🏓")
+
+@bot.command()
+async def info(ctx):
+    """Display bot information."""
+    await ctx.reply(
+        f"**Bot Info**\n"
+        f"Username: {bot.user.username}\n"
+        f"Guilds: {len(bot.guilds)}\n"
+        f"Prefix: {bot.command_prefix}"
+    )
+
+# Commands with arguments
+@bot.command()
+async def add(ctx, a: int, b: int):
+    """Add two numbers together."""
+    result = a + b
+    await ctx.reply(f"{a} + {b} = {result}")
+
+@bot.command()
+async def multiply(ctx, a: float, b: float):
+    """Multiply two numbers."""
+    result = a * b
+    await ctx.reply(f"{a} × {b} = {result}")
+
+# Keyword-only argument (captures all remaining text)
+@bot.command()
+async def say(ctx, *, message: str):
+    """Make the bot repeat your message."""
+    await ctx.reply(message)
+
+@bot.command()
+async def announce(ctx, *, text: str):
+    """Send an announcement."""
+    await ctx.send(f"📢 **Announcement:** {text}")
+
+# Command with default value
+@bot.command()
+async def repeat(ctx, text: str, times: int = 3):
+    """Repeat text a number of times."""
+    if times > 10:
+        await ctx.reply("Maximum 10 repetitions allowed!")
+        return
+    await ctx.reply(text * times)
+
+if __name__ == "__main__":
+    TOKEN = "your_bot_token_here"
+    bot.run(TOKEN)
+```
+
+## Error Handling
+
+The bot automatically handles missing required arguments:
+
+```python
+@bot.command()
+async def greet(ctx, name: str):
+    await ctx.reply(f"Hello, {name}!")
+
+# If user types "!greet" without a name:
+# Bot responds: "❌ Error: greet() missing 1 required positional argument: 'name'"
+```
+
+<Note>
+All event handlers and commands run asynchronously. Use `await` for async operations like sending messages or fetching data.
+</Note>
+
+## Best Practices
+
+<Steps>
+  <Step title="Use appropriate intents">
+    Only request the intents you need:
+    
+    ```python
+    # Most bots can use default intents
+    bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.default())
+    
+    # For all events (higher gateway load)
+    bot = fluxer.Bot(command_prefix="!", intents=fluxer.Intents.all())
+    ```
+  </Step>
+  
+  <Step title="Check for bot messages">
+    Prevent infinite loops by ignoring bot messages:
+    
+    ```python
+    @bot.event
+    async def on_message(message):
+        if message.author.bot:
+            return
+        # Your code here
+    ```
+  </Step>
+  
+  <Step title="Use type hints for arguments">
+    Type hints automatically convert string arguments:
+    
+    ```python
+    @bot.command()
+    async def kick(ctx, user_id: int):
+        # user_id is automatically converted to int
+        pass
+    ```
+  </Step>
+  
+  <Step title="Handle errors gracefully">
+    Wrap risky operations in try/except blocks:
+    
+    ```python
+    @bot.command()
+    async def fetch(ctx, user_id: str):
+        try:
+            user = await bot.fetch_user(user_id)
+            await ctx.reply(f"Found: {user.username}")
+        except Exception as e:
+            await ctx.reply(f"Error: {e}")
+    ```
+  </Step>
+</Steps>
+
+## Next Steps
+
+- Learn about [Cogs](/examples/cog-example) for organizing commands into modules
+- Explore [Voice Playback](/examples/voice-playback) for audio features
+- Check the [API Reference](/api/bot) for all available methods

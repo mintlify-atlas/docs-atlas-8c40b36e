@@ -1,0 +1,214 @@
+---
+title: Intents
+description: Gateway intents control which events your bot receives
+---
+
+## Overview
+
+Intents are bitfield flags that tell the Fluxer gateway which events you want to receive. This helps reduce bandwidth and processing overhead by only subscribing to the events you need.
+
+## Usage
+
+```python
+import fluxer
+from fluxer import Intents
+
+# Option 1: Use default intents (excludes privileged intents)
+intents = Intents.default()
+
+# Option 2: Combine specific intents
+intents = Intents.GUILDS | Intents.GUILD_MESSAGES | Intents.MESSAGE_CONTENT
+
+# Option 3: Start with all and remove what you don't need
+intents = Intents.all()
+intents &= ~Intents.GUILD_PRESENCES  # Remove presences
+
+# Option 4: Start with none and add what you need
+intents = Intents.none()
+intents |= Intents.GUILDS
+intents |= Intents.GUILD_MESSAGES
+
+bot = fluxer.Bot(intents=intents)
+```
+
+## Intent Flags
+
+All available intent flags:
+
+<ParamField path="GUILDS" type="int">
+  Events related to guild/server changes (guild create, update, delete, role updates, channel updates)
+</ParamField>
+
+<ParamField path="GUILD_MEMBERS" type="int">
+  **Privileged**: Events when members join, leave, or are updated
+</ParamField>
+
+<ParamField path="GUILD_MODERATION" type="int">
+  Events for bans and unbans
+</ParamField>
+
+<ParamField path="GUILD_EMOJIS_AND_STICKERS" type="int">
+  Events when custom emojis and stickers are created, updated, or deleted
+</ParamField>
+
+<ParamField path="GUILD_INTEGRATIONS" type="int">
+  Events for integration updates (bots, webhooks, etc.)
+</ParamField>
+
+<ParamField path="GUILD_WEBHOOKS" type="int">
+  Events when webhooks are created, updated, or deleted
+</ParamField>
+
+<ParamField path="GUILD_INVITES" type="int">
+  Events when invites are created or deleted
+</ParamField>
+
+<ParamField path="GUILD_VOICE_STATES" type="int">
+  Events when users join, leave, or update their voice state
+</ParamField>
+
+<ParamField path="GUILD_PRESENCES" type="int">
+  **Privileged**: Events when user presence/status changes
+</ParamField>
+
+<ParamField path="GUILD_MESSAGES" type="int">
+  Events when messages are sent, edited, or deleted in guilds
+</ParamField>
+
+<ParamField path="GUILD_MESSAGE_REACTIONS" type="int">
+  Events when reactions are added or removed from guild messages
+</ParamField>
+
+<ParamField path="GUILD_MESSAGE_TYPING" type="int">
+  Events when users start typing in guild channels
+</ParamField>
+
+<ParamField path="DIRECT_MESSAGES" type="int">
+  Events for DM messages (sent, edited, deleted)
+</ParamField>
+
+<ParamField path="DIRECT_MESSAGE_REACTIONS" type="int">
+  Events when reactions are added or removed from DM messages
+</ParamField>
+
+<ParamField path="DIRECT_MESSAGE_TYPING" type="int">
+  Events when users start typing in DMs
+</ParamField>
+
+<ParamField path="MESSAGE_CONTENT" type="int">
+  **Privileged**: Required to receive message content in events. Without this, `message.content` will be empty.
+</ParamField>
+
+## Class Methods
+
+### `Intents.default()`
+
+Returns a sensible default set of intents that excludes privileged intents.
+
+**Excluded intents:**
+- `GUILD_MEMBERS`
+- `GUILD_PRESENCES`
+- `MESSAGE_CONTENT`
+
+```python
+intents = Intents.default()
+```
+
+<ResponseField name="return" type="Intents">
+  An Intents instance with all non-privileged intents enabled
+</ResponseField>
+
+---
+
+### `Intents.all()`
+
+Returns all intents enabled, including privileged ones.
+
+```python
+intents = Intents.all()
+```
+
+<ResponseField name="return" type="Intents">
+  An Intents instance with all intents enabled
+</ResponseField>
+
+---
+
+### `Intents.none()`
+
+Returns no intents enabled. Useful as a starting point to add only specific intents.
+
+```python
+intents = Intents.none()
+intents |= Intents.GUILDS
+intents |= Intents.GUILD_MESSAGES
+```
+
+<ResponseField name="return" type="Intents">
+  An Intents instance with no intents enabled
+</ResponseField>
+
+## Privileged Intents
+
+Three intents require special approval in the Discord Developer Portal:
+
+1. **GUILD_MEMBERS** - Required for member join/leave events
+2. **GUILD_PRESENCES** - Required for presence/status updates
+3. **MESSAGE_CONTENT** - Required to read message content
+
+To enable privileged intents:
+1. Go to the [Discord Developer Portal](https://discord.com/developers/applications)
+2. Select your application
+3. Navigate to the "Bot" tab
+4. Scroll to "Privileged Gateway Intents"
+5. Enable the intents you need
+
+## Examples
+
+### Basic Bot with Messages
+
+```python
+import fluxer
+from fluxer import Intents
+
+intents = Intents.default()
+intents |= Intents.MESSAGE_CONTENT  # Enable privileged intent
+
+bot = fluxer.Bot(intents=intents)
+
+@bot.event
+async def on_message(message):
+    print(f"{message.author}: {message.content}")
+
+bot.run("YOUR_TOKEN")
+```
+
+### Minimal Bot (Guild Commands Only)
+
+```python
+import fluxer
+from fluxer import Intents
+
+# Only receive guild and message events
+intents = Intents.GUILDS | Intents.GUILD_MESSAGES
+
+bot = fluxer.Bot(intents=intents)
+bot.run("YOUR_TOKEN")
+```
+
+### Voice Bot
+
+```python
+import fluxer
+from fluxer import Intents
+
+intents = Intents.default()
+intents |= Intents.GUILD_VOICE_STATES  # Required for voice
+
+bot = fluxer.Bot(intents=intents)
+bot.run("YOUR_TOKEN")
+```
+
+## Source Reference
+
+Defined in `fluxer/enums.py:33-84`
